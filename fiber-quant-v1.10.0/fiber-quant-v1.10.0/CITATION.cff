@@ -1,0 +1,29 @@
+cff-version: 1.10.0
+message: "If you use this software, please cite both the article and the archived software version."
+title: "FiberQuant: browser-based quantification of muscle injury and regeneration"
+version: 1.10.0
+date-released: "[YYYY-MM-DD]"
+license: MIT
+repository-code: "https://github.com/[user]/[repository]"
+doi: "[Zenodo DOI]"
+type: software
+keywords:
+  - skeletal muscle
+  - regeneration
+  - image analysis
+  - centrally nucleated fibers
+  - embryonic myosin heavy chain
+authors:
+  - family-names: "[Family name]"
+    given-names: "[Given name]"
+    affiliation: "[Institution]"
+    orcid: "https://orcid.org/[0000-0000-0000-0000]"
+preferred-citation:
+  type: article
+  title: "[Article title]"
+  journal: "[Journal]"
+  year: "[YYYY]"
+  doi: "[Article DOI]"
+  authors:
+    - family-names: "[Family name]"
+      given-names: "[Given name]"

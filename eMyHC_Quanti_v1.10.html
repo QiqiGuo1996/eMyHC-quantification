@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>肌纤维损伤区定量 Muscle fiber injury quantification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#E8EBEE; --surface:#F8F9FA; --ink:#1C2632; --muted:#5A6573; --line:#C9D0D8;
+  --accent:#2E57C9; --accent-ink:#FFFFFF; --soft:#DDE3EA; --warn:#9A3B12;
+  --font:"IBM Plex Sans","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#161A1F; --surface:#1E242B; --ink:#E4E8EC; --muted:#99A3AE; --line:#2F3842;
+    --accent:#86A2FF; --accent-ink:#0E1420; --soft:#262E37; --warn:#F0A47A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#161A1F; --surface:#1E242B; --ink:#E4E8EC; --muted:#99A3AE; --line:#2F3842;
+  --accent:#86A2FF; --accent-ink:#0E1420; --soft:#262E37; --warn:#F0A47A;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.55}
+button,input,select{font:inherit;color:inherit}
+h1{font-size:20px;font-weight:600;margin:0;letter-spacing:.01em}
+h1 .en{font-size:13px;margin-top:2px}
+h2{font-size:15px;font-weight:600;margin:0 0 10px}
+.top{padding:18px 22px 14px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline}
+.top p{margin:0;color:var(--muted);max-width:76ch}
+.en{display:block;font-size:11.5px;color:var(--muted);line-height:1.3;font-weight:400;letter-spacing:0}
+.en.i{display:inline;margin-left:5px}
+.btn .en,.btn.primary .en{color:inherit;opacity:.8}
+.status .en{margin-top:2px}
+.layout{display:grid;grid-template-columns:372px minmax(0,1fr);min-height:calc(100vh - 70px)}
+aside{border-right:1px solid var(--line);background:var(--surface);padding:6px 0 24px;overflow-y:auto}
+.step{padding:14px 20px;border-bottom:1px solid var(--line)}
+.step h2 .num{display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--surface);font-size:12px;text-align:center;line-height:20px;margin-right:8px;vertical-align:1px}
+.field{display:grid;grid-template-columns:1fr 144px;gap:8px;align-items:center;margin:7px 0}
+.field label{color:var(--ink)}
+.field.wide{grid-template-columns:1fr 168px}
+.field .hint,.hint{grid-column:1/-1;color:var(--muted);font-size:12.5px;margin-top:-4px;line-height:1.45}
+input[type=number],select{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:5px;background:var(--bg)}
+input[type=number]:disabled{opacity:.55}
+.pair{display:flex;gap:6px}
+.pair input{min-width:0}
+.thr{display:flex;gap:5px;align-items:center}
+.thr input[type=number]{width:48px;flex:none;padding:5px 4px}
+.thr label{font-size:12.5px;color:var(--muted);display:flex;gap:3px;align-items:center;white-space:nowrap}
+.check{display:flex;gap:8px;align-items:flex-start;margin:8px 0}
+.check input{margin-top:3px}
+details.group{margin:8px 0 0;border-top:1px dashed var(--line);padding-top:8px}
+details.group summary{cursor:pointer;font-weight:500;padding:3px 0}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600;padding:9px 14px;width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.file{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.file input{max-width:100%}
+.meta{color:var(--muted);font-size:12.5px;margin-top:8px}
+.status{margin-top:10px;font-size:13px;color:var(--muted);min-height:20px}
+.status.err{color:var(--warn)}
+.bar{height:3px;background:var(--soft);border-radius:2px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+main{min-width:0;display:flex;flex-direction:column}
+.viewbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--surface);font-size:13px}
+.viewbar label{display:flex;gap:4px;align-items:center;white-space:nowrap}
+.viewbar .sep{width:1px;height:18px;background:var(--line)}
+.zoom{display:flex;gap:4px;margin-left:auto}
+.zoom .btn{padding:3px 9px}
+.stage{position:relative;background:#000;height:min(68vh,760px);overflow:auto;cursor:crosshair;touch-action:none}
+.stage canvas{display:block}
+.layer{position:relative;width:max-content}
+.layer svg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.stage.drawing{cursor:cell}
+.segbtn{display:inline-flex;gap:0}
+.segbtn .btn{border-radius:0;margin-left:-1px}
+.segbtn .btn:first-child{border-radius:6px 0 0 6px;margin-left:0}
+.segbtn .btn:last-child{border-radius:0 6px 6px 0}
+.btn.sel{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);position:relative}
+.btn.on{background:#FF8A3D;border-color:#FF8A3D;color:#1d0e00}
+.stage .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#9aa3ad;text-align:center;padding:24px;line-height:1.7}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;padding:7px 14px;font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--line)}
+.legend b{display:inline-block;width:13px;height:13px;border-radius:2px;margin-right:5px;vertical-align:-2px;border:2px solid;background-color:#000}
+.results{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:0;border-bottom:1px solid var(--line)}
+.key{padding:18px 22px;border-right:1px solid var(--line)}
+.key .big{font-size:44px;font-weight:600;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.key .cap{color:var(--muted);margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;margin-top:16px}
+.stats div{font-variant-numeric:tabular-nums}
+.stats span{display:block;color:var(--muted);font-size:12.5px}
+.stats strong{font-weight:500;font-size:16px}
+.fiber{padding:18px 22px}
+.fiber dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:8px 0 12px;font-variant-numeric:tabular-nums}
+.fiber dt{color:var(--muted)}
+.fiber dd{margin:0}
+.fiber .acts{display:flex;flex-wrap:wrap;gap:6px}
+.tablewrap{padding:14px 22px 30px}
+.tablehead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:8px}
+.tablehead h2{margin:0 auto 0 0}
+.scroll{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}
+th,td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{position:sticky;top:0;background:var(--soft);font-weight:500;z-index:1}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--soft)}
+tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.tag{display:inline-block;padding:0 6px;border-radius:3px;font-size:12px}
+.tag.inj{background:#FFD23F;color:#3a2d00}
+.tag.ex{background:var(--soft);color:var(--muted)}
+.notes{padding:0 22px 30px;color:var(--muted);font-size:13px;max-width:80ch}
+.notes summary{cursor:pointer;color:var(--ink);font-weight:500}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+@media (max-width:860px){
+  .layout{grid-template-columns:1fr}
+  aside{border-right:0;border-bottom:1px solid var(--line)}
+  .results{grid-template-columns:1fr}
+  .key{border-right:0;border-bottom:1px solid var(--line)}
+  .stage{height:60vh}
+}
+@media (prefers-reduced-motion:reduce){.bar i,.toast{transition:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>肌纤维损伤区定量 <small style="font-size:12px;font-weight:500;color:var(--muted)">v1.10.0</small><span class="en">Muscle fiber injury quantification</span></h1>
+  <p>按WGA轮廓分割每根肌纤维，以中心区有无细胞核界定损伤纤维，计算红色阳性面积占损伤区面积的比例。图像只在本机浏览器中处理，不会上传。<span class="en">Segments fibers from WGA outlines, defines injured fibers by nuclei in the fiber core, and measures red-positive area as a share of the injured area. Images are processed locally in your browser and never uploaded.</span></p>
+</header>
+
+<div class="layout">
+<aside>
+  <section class="step">
+    <h2><span class="num">1</span>载入图像<span class="en i">Load image</span></h2>
+    <div class="file">
+      <input type="file" id="file" accept=".tif,.tiff,.png,.jpg,.jpeg">
+      <button class="btn" id="demo" type="button">用示例图试一试<span class="en">Try a sample image</span></button>
+    </div>
+    <div class="hint" style="margin-top:8px">支持RGB合成图（PNG、JPG、TIFF），以及每页一个通道的多页TIFF（8位或16位）。超过4 GB的BigTIFF需先在Fiji中缩小另存。<span class="en">Accepts RGB composites (PNG, JPG, TIFF) and multi-page TIFFs with one channel per page (8- or 16-bit). BigTIFF files over 4 GB must be downscaled in Fiji first.</span></div>
+    <div class="meta" id="meta"></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">2</span>通道与比例尺<span class="en i">Channels and scale</span></h2>
+    <div class="field"><label for="chMem">纤维轮廓（WGA）<span class="en">Fiber outline (WGA)</span></label><select id="chMem"></select></div>
+    <div class="field"><label for="chNuc">细胞核（DAPI）<span class="en">Nuclei (DAPI)</span></label><select id="chNuc"></select></div>
+    <div class="field"><label for="chMk">阳性标记（红色）<span class="en">Positive marker (red)</span></label><select id="chMk"></select></div>
+    <div class="field"><label for="pxUm">原图像素尺寸（µm/像素）<span class="en">Original pixel size (µm/px)</span></label><input type="number" id="pxUm" value="0.65" step="0.01" min="0.01">
+      <div class="hint">可在Fiji的 Image › Properties 中查看。<span class="en">Find it in Fiji under Image › Properties.</span></div></div>
+    <div class="field"><label for="scale">处理时缩小倍数<span class="en">Downscale for processing</span></label>
+      <select id="scale"><option value="auto">自动 Auto</option><option value="target">统一分辨率 Common</option><option>1</option><option>2</option><option>3</option><option>4</option><option>6</option><option>8</option></select>
+      <div class="hint" id="workInfo">大图缩小后处理更快，也能避免浏览器内存不足。<span class="en">Downscaling large images speeds up processing and avoids running out of browser memory.</span></div></div>
+    <div class="field"><label for="targetUm">统一处理分辨率（µm/像素）<span class="en">Common working resolution (µm/px)</span></label><input type="number" id="targetUm" value="0.91" min="0.05" step="0.01" disabled>
+      <div class="hint">"处理时缩小倍数"选"统一分辨率"时生效：每张图按自己的像素尺寸缩放到这个分辨率再分析，使不同图像的参数含义一致。建议取这批图中最低的分辨率（最大的数值）。<span class="en">Used when "Downscale for processing" is set to Common: each image is rescaled from its own pixel size to this resolution, so parameters mean the same in every image. Use the coarsest resolution (largest value) in the batch.</span></div></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">3</span>分割与判定参数<span class="en i">Segmentation and classification</span></h2>
+    <details class="group" open>
+      <summary>纤维分割<span class="en i">Fiber segmentation</span></summary>
+      <div class="field"><label for="memBg">背景扣除半径（µm）<span class="en">Background radius (µm)</span></label><input type="number" id="memBg" value="40" min="0" step="5"></div>
+      <div class="field"><label for="memSig">平滑σ（像素）<span class="en">Smoothing σ (px)</span></label><input type="number" id="memSig" value="1" min="0" step="0.5"></div>
+      <div class="field"><label for="memThr">阈值<span class="en">Threshold</span></label>
+        <div class="thr"><input type="number" id="memThr" min="0" max="255" step="1" disabled><label><input type="checkbox" id="memAuto" checked>自动 Auto</label></div></div>
+      <div class="field"><label for="memDil">膜加粗（像素）<span class="en">Membrane dilation (px)</span></label><input type="number" id="memDil" value="3" min="0" max="8" step="1">
+        <div class="hint">可封住WGA环上宽度约为2倍此值的缺口；纤维随后自动长回原轮廓。建议约4 µm对应的像素数（0.9 µm/像素时取4–5）。半径小于此值的小纤维会丢失。<span class="en">Closes gaps in WGA rings up to about twice this width; fibers then grow back to their outlines. About 4 µm in pixels is a good start (4–5 at 0.9 µm/px). Fibers with a radius below this value are lost.</span></div></div>
+      <div class="field wide"><label>纤维面积范围（µm²）<span class="en">Fiber area range (µm²)</span></label>
+        <div class="pair"><input type="number" id="aMin" value="80" min="0" step="10" aria-label="最小面积"><input type="number" id="aMax" value="12000" min="0" step="500" aria-label="最大面积"></div></div>
+      <label class="check"><input type="checkbox" id="dil2On" checked><span>用较小的膜加粗再分割一遍，补回小纤维<span class="en">Second pass with smaller dilation to recover small fibers</span></span></label>
+      <div class="field"><label for="memDil2">第二遍膜加粗（像素）<span class="en">Second-pass dilation (px)</span></label><input type="number" id="memDil2" value="1" min="0" max="7" step="1">
+        <div class="hint">大的膜加粗会把小纤维整个腐蚀掉。第二遍只在第一遍没有纤维的地方补充，补出的区域同样经过面积、形状和细胞核筛选。<span class="en">Large dilation erases small fibers. The second pass only adds regions where the first found no fiber, and they pass the same area, shape and nuclear filters.</span></div></div>
+      <label class="check"><input type="checkbox" id="noBorder" checked><span>排除接触图像边缘的纤维<span class="en">Exclude fibers touching the image edge</span></span></label>
+    </details>
+    <details class="group" open>
+      <summary>纤维与间质分离<span class="en i">Fiber–interstitium separation</span></summary>
+      <div class="hint" style="margin:4px 0 6px">WGA环不完整时，纤维会经缺口与间质连成一片。先把"膜加粗"调到约4 µm对应的像素数来封住缺口，再用下面两项剔除被误当成纤维的间质。<span class="en">When WGA rings are incomplete, fibers merge with the interstitium through the gaps. First set membrane dilation to about 4 µm in pixels to close the gaps, then use these two filters to reject interstitium mistaken for fibers.</span></div>
+      <div class="field"><label for="solMin">最小凸度<span class="en">Min. solidity</span></label><input type="number" id="solMin" value="0.9" min="0" max="1" step="0.01">
+        <div class="hint">凸度 = 面积 ÷ 凸包面积，圆形、椭圆形纤维约为0.94–0.98；被几根纤维夹住的缝隙边缘内凹，通常低于0.9。设为0则不筛选。<span class="en">Solidity = area ÷ convex-hull area: about 0.94–0.98 for round or oval fibers, usually below 0.9 for gaps squeezed between fibers. 0 disables.</span></div></div>
+      <div class="field"><label for="riMin">最小内切半径（µm）<span class="en">Min. inscribed radius (µm)</span></label><input type="number" id="riMin" value="2.5" min="0" step="0.5">
+        <div class="hint">区域内能放下的最大圆的半径。相邻纤维之间的缝隙很窄，低于此值的区域不算纤维；设为0则不筛选。<span class="en">Radius of the largest circle that fits in the region. Gaps between neighboring fibers are narrow; regions below this value are rejected. 0 disables.</span></div></div>
+      <div class="field"><label for="shapeMax">最大形状指数<span class="en">Max. shape index</span></label><input type="number" id="shapeMax" value="4" min="0" step="0.5">
+        <div class="hint">形状指数 = 面积 ÷ 最大内切圆面积，圆形为1，不规则的间质网络很大。超过此值的区域不算纤维；设为0则不筛选。<span class="en">Area ÷ area of the largest inscribed circle: 1 for a circle, large for branching interstitium. Regions above this value are rejected; 0 disables.</span></div></div>
+      <div class="field"><label for="nucMax">纤维内最大细胞核占比（%）<span class="en">Max. nuclear area in a fiber (%)</span></label><input type="number" id="nucMax" value="50" min="0" max="100" step="5">
+        <div class="hint">细胞核占比超过此值的区域视为间质；设为0则不筛选。<span class="en">Regions with more nuclear area are treated as interstitium; 0 disables.</span></div></div>
+      <label class="check"><input type="checkbox" id="redKeep" checked><span>红色阳性占一半以上的区域不按细胞核占比剔除（保护含中央核的小再生纤维）<span class="en">Do not reject regions that are at least half red+ for nuclear content (protects small regenerating fibers with central nuclei)</span></span></label>
+    </details>
+    <details class="group" open>
+      <summary>中央核判定<span class="en i">Central nuclei</span></summary>
+      <div class="field"><label for="nucBg">细胞核背景扣除半径（µm）<span class="en">Nuclear background radius (µm)</span></label><input type="number" id="nucBg" value="20" min="0" step="5"></div>
+      <div class="field"><label for="nucThr">细胞核阈值<span class="en">Nuclear threshold</span></label>
+        <div class="thr"><input type="number" id="nucThr" min="0" max="255" step="1" disabled><label><input type="checkbox" id="nucAuto" checked>自动 Auto</label></div></div>
+      <div class="field"><label for="inset">中心区内缩距离（µm）<span class="en">Core inset (µm)</span></label><input type="number" id="inset" value="4" min="0" step="0.5">
+        <div class="hint">从纤维边缘向内缩，排除膜下的正常边缘核。小纤维的内缩距离自动封顶为其内切半径的40%。<span class="en">Shrinks each outline inward to exclude normal subsarcolemmal nuclei. For small fibers the inset is capped at 40% of the inscribed radius.</span></div></div>
+      <div class="field"><label for="minNuc">中心区最小核面积（µm²）<span class="en">Min. nuclear area in core (µm²)</span></label><input type="number" id="minNuc" value="6" min="0" step="1"></div>
+    </details>
+    <details class="group" open>
+      <summary>阳性标记<span class="en i">Positive marker</span></summary>
+      <div class="field"><label for="mkBg">背景扣除半径（µm）<span class="en">Background radius (µm)</span></label><input type="number" id="mkBg" value="40" min="0" step="5"></div>
+      <div class="field"><label for="mkThr">阈值<span class="en">Threshold</span></label>
+        <div class="thr"><input type="number" id="mkThr" min="0" max="255" step="1" disabled><label><input type="checkbox" id="mkAuto" checked>自动 Auto</label></div></div>
+      <div class="field"><label for="mkFrac">判为阳性纤维的面积占比（%）<span class="en">Area fraction for red+ fiber (%)</span></label><input type="number" id="mkFrac" value="20" min="0" max="100" step="5"></div>
+      <div class="field"><label for="mkBand">阳性判定外扩距离（µm）<span class="en">Margin for red+ call (µm)</span></label><input type="number" id="mkBand" value="0" min="0" max="10" step="0.5">
+        <div class="hint">判定阳性时把纤维轮廓向外扩这么多，用于红色集中在纤维外缘、落在分割轮廓之外的情况。建议1–3 µm；只影响阳性判定，不改变纤维面积。<span class="en">Extends each outline outward when calling red+, for red signal at the fiber rim just outside the segmented outline. 1–3 µm is typical; it affects only the call, not fiber area.</span></div></div>
+      <label class="check"><input type="checkbox" id="rsOn" checked><span>用红色信号补充识别漏掉的小纤维<span class="en">Detect small red+ fibers missed by WGA segmentation</span></span></label>
+      <div class="field wide"><label>补充识别面积范围（µm²）<span class="en">Area range for red-detected fibers (µm²)</span></label>
+        <div class="pair"><input type="number" id="rsMin" value="40" min="0" step="5" aria-label="最小面积"><input type="number" id="rsMax" value="600" min="0" step="50" aria-label="最大面积"></div></div>
+      <div class="field"><label for="rsThr">补充识别红色阈值<span class="en">Red threshold for detection</span></label>
+        <div class="thr"><input type="number" id="rsThr" min="0" max="255" step="1" disabled><label><input type="checkbox" id="rsAuto" checked>自动 Auto</label></div>
+        <div class="hint">比上面的红色阈值更严格，默认在红色阳性像素中再做一次Otsu，避免小纤维与周围淡红色背景连成一片。漏检时调低，误检时调高。<span class="en">Stricter than the red threshold above: by default a second Otsu among red+ pixels, so small fibers do not merge with faint red background. Lower it if fibers are missed, raise it if false objects appear.</span></div>
+        <div class="hint">不与已识别纤维相连、大致呈圆形（内切半径≥2.5 µm、形状指数≤3）、且不完全落在WGA膜上的红色阳性小块（包括中间空心的环形）会被补充为纤维。<span class="en">Red+ objects, including rings with an unstained center, are added as fibers if they do not touch a detected fiber, are roughly round (inscribed radius ≥ 2.5 µm, shape index ≤ 3) and do not lie mostly on the WGA membrane.</span></div></div>
+      <div class="field"><label for="mkMode">红色阳性面积计算方式<span class="en">Red+ area method</span></label>
+        <select id="mkMode"><option value="px">按像素 Pixels</option><option value="fiber">阳性纤维整根 Whole red+ fibers</option></select>
+        <div class="hint">按像素：只计红色阳性像素。阳性纤维整根：判为阳性的纤维按整根面积计入。两种方式下，手动标为阳性的纤维都按整根面积计入，手动标为阴性的不计入。<span class="en">Pixels counts red+ pixels only; whole red+ fibers counts the full area of each red+ fiber. In both, fibers marked red+ by hand count in full and fibers marked red− count as zero.</span></div></div>
+      <label class="check"><input type="checkbox" id="inclMk"><span>红色阳性纤维即使没有中央核也计入损伤区<span class="en">Count red+ fibers as injured even without central nuclei</span></span></label>
+    </details>
+    <details class="group" open>
+      <summary>无纤维损伤区<span class="en i">Fiber-free injured areas</span></summary>
+      <div class="hint" style="margin:4px 0 6px">用图像上方的"框选损伤区"手动圈画，或自动识别DAPI密集区。区域内没有纤维的部分计入损伤区，其中的红色像素也计入红色阳性面积；区域内的纤维仍按各自的判定。<span class="en">Draw regions with "Draw injured area" above the image, or auto-detect DAPI-dense areas. Fiber-free pixels in these regions are added to the injured area, and their red pixels to the red+ area; fibers inside keep their own calls.</span></div>
+      <label class="check"><input type="checkbox" id="dnAuto"><span>自动识别DAPI密集且无纤维的区域<span class="en">Auto-detect DAPI-dense areas without fibers</span></span></label>
+      <div class="field"><label for="dnR">密度计算半径（µm）<span class="en">Density radius (µm)</span></label><input type="number" id="dnR" value="15" min="2" step="1"></div>
+      <div class="field"><label for="dnPct">细胞核覆盖率阈值（%）<span class="en">Nuclear coverage threshold (%)</span></label><input type="number" id="dnPct" value="25" min="1" max="100" step="5"></div>
+      <div class="field"><label for="dnMin">最小区域面积（µm²）<span class="en">Min. region area (µm²)</span></label><input type="number" id="dnMin" value="1500" min="0" step="100"></div>
+      <div class="hint" style="margin:10px 0 2px">把未识别为纤维的区域计入损伤区：<span class="en">Count regions not detected as fibers as injured:</span></div>
+      <label class="check"><input type="checkbox" id="incInter"><span>间质（形状不规则或细胞核过多）<span class="en">Interstitium (irregular shape or nucleus-rich)</span></span></label>
+      <label class="check"><input type="checkbox" id="incLarge"><span>过大区域（多根纤维连在一起）<span class="en">Oversized regions (merged fibers)</span></span></label>
+      <label class="check"><input type="checkbox" id="incSmall"><span>过小碎片<span class="en">Small fragments</span></span></label>
+      <label class="check"><input type="checkbox" id="incBorder"><span>接触图像边缘的区域<span class="en">Regions touching the image edge</span></span></label>
+      <div class="hint">单击图中灰色区域，可单独计入或取消。与切片外背景相连的区域不会计入。<span class="en">Click a grey region to include or exclude it individually. Regions connected to the background outside the section are never included.</span></div>
+    </details>
+  </section>
+
+  <section class="step">
+    <button class="btn primary" id="run" type="button" disabled>运行分析 Run analysis</button>
+    <div class="status" id="status">先载入一张图像。<span class="en">Load an image to begin.</span></div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="hint" id="diag" style="margin-top:10px"></div>
+  </section>
+</aside>
+
+<main>
+  <div class="viewbar">
+    <label><input type="checkbox" id="vMem" checked>WGA</label>
+    <label><input type="checkbox" id="vNuc" checked>细胞核<span class="en i">Nuclei</span></label>
+    <label><input type="checkbox" id="vMk" checked>红色<span class="en i">Red</span></label>
+    <label>亮度<span class="en i">Brightness</span><input type="range" id="gain" min="0.5" max="4" step="0.1" value="1.3" style="width:80px"></label>
+    <span class="sep"></span>
+    <label><input type="checkbox" id="oLine" checked>纤维轮廓<span class="en i">Outlines</span></label>
+    <label><input type="checkbox" id="oFill" checked>损伤区填充<span class="en i">Injury fill</span></label>
+    <label><input type="checkbox" id="oMk">红色阳性像素<span class="en i">Red+ pixels</span></label>
+    <label><input type="checkbox" id="oNuc">细胞核掩膜<span class="en i">Nuclear mask</span></label>
+    <label><input type="checkbox" id="oRej" checked>未识别区域<span class="en i">Undetected regions</span></label>
+    <label><input type="checkbox" id="oRed" checked>红色阳性纤维<span class="en i">Red+ fibers</span></label>
+    <label><input type="checkbox" id="oEx" checked>无纤维损伤区<span class="en i">Fiber-free injury</span></label>
+    <label>编号<span class="en i">IDs</span><select id="oId" style="width:auto;padding:2px 4px"><option value="none">不显示 None</option><option value="all">全部纤维 All</option><option value="inj">仅损伤区 Injured</option></select></label>
+    <span class="sep"></span>
+    <button class="btn" id="drawBtn" type="button" disabled>框选损伤区<span class="en i">Draw injured area</span></button>
+    <button class="btn" id="drawFib" type="button" disabled>圈画纤维<span class="en i">Draw fiber</span></button>
+    <button class="btn" id="drawRed" type="button" disabled>圈画红色阳性<span class="en i">Draw red+</span></button>
+    <button class="btn" id="undoBtn" type="button" disabled>撤销 Undo</button>
+    <button class="btn" id="clearBtn" type="button" disabled>清除 Clear</button>
+    <div class="zoom">
+      <button class="btn" id="zOut" type="button" aria-label="缩小">−</button>
+      <button class="btn" id="zFit" type="button">适应 Fit</button>
+      <button class="btn" id="z1" type="button">1:1</button>
+      <button class="btn" id="zIn" type="button" aria-label="放大">+</button>
+    </div>
+  </div>
+  <div class="stage" id="stage">
+    <div class="layer" id="layer"><canvas id="cv" width="1" height="1"></canvas><svg id="svg" preserveAspectRatio="none" aria-hidden="true"><g id="polyG"></g><polyline id="drawLine" points="" fill="rgba(255,138,61,.18)" stroke="#FF8A3D" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+    <div class="empty" id="empty">载入图像后在这里显示。<br>拖动平移，按住Ctrl滚动滚轮缩放，单击纤维查看详情。<br><span style="font-size:12.5px">The image appears here. Drag to pan, Ctrl + scroll to zoom, click a fiber for details.</span></div>
+  </div>
+  <div class="legend">
+    <span><b style="border-color:#FFD23F;background-color:#3d3518"></b>损伤区纤维（中央核）<span class="en i">Injured fibers (central nuclei)</span></span>
+    <span><b style="border-color:#FF8A3D;background-color:#5a3015"></b>无纤维损伤区<span class="en i">Fiber-free injured area (drawn or DAPI-dense)</span></span>
+    <span><b style="border-color:#FF3CC8;border-style:dashed"></b>手动圈画的红色阳性区域<span class="en i">Drawn red+ areas</span></span>
+    <span><b style="border-color:#FF3CC8"></b>红色阳性纤维（粉色内圈）<span class="en i">Red+ fibers (magenta inner ring)</span></span>
+    <span><b style="border-color:#E8E8E8"></b>其他纤维<span class="en i">Other fibers</span></span>
+    <span><b style="border-color:#9696aa;background-color:#4b4b55"></b>未识别区域（单击查看原因）<span class="en i">Undetected regions (click for the reason)</span></span>
+    <span><b style="border-color:#777"></b>已排除<span class="en i">Excluded</span></span>
+    <span><b style="border-color:#36D7FF;background-color:#134b59"></b>选中的纤维，青色填充为其中心区<span class="en i">Selected fiber; cyan fill marks its core</span></span>
+  </div>
+
+  <div class="results">
+    <div class="key">
+      <div class="big" id="rRatio">–</div>
+      <div class="cap">损伤区内红色阳性面积 ÷ 损伤区面积<span class="en">Red+ area within injured region ÷ injured area</span></div>
+      <div class="stats">
+        <div><span>识别的纤维 <i style="font-style:normal">Fibers detected</i></span><strong id="rFib">–</strong></div>
+        <div><span>中央核纤维 <i style="font-style:normal">Centrally nucleated fibers</i></span><strong id="rCnf">–</strong></div>
+        <div><span>损伤区面积 <i style="font-style:normal">Injured area</i></span><strong id="rInj">–</strong></div>
+        <div><span>损伤区内红色阳性面积 <i style="font-style:normal">Red+ area in injured region</i></span><strong id="rMk">–</strong></div>
+        <div><span>损伤区内红色阳性纤维 <i style="font-style:normal">Red+ fibers in injured region</i></span><strong id="rMkF">–</strong></div>
+        <div><span>损伤纤维占全部纤维面积 <i style="font-style:normal">Injured fibers' share of fiber area</i></span><strong id="rInjPct">–</strong></div>
+        <div><span>损伤纤维面积 均值 ± SD <i style="font-style:normal">Injured fiber area, mean ± SD</i></span><strong id="rInjMean">–</strong></div>
+        <div><span>损伤纤维面积 中位数 <i style="font-style:normal">Injured fiber area, median</i></span><strong id="rInjMed">–</strong></div>
+        <div><span>非损伤纤维面积 均值 ± SD <i style="font-style:normal">Non-injured fiber area, mean ± SD</i></span><strong id="rNonMean">–</strong></div>
+        <div><span>红色阳性损伤纤维面积 均值 ± SD <i style="font-style:normal">Red+ injured fiber area, mean ± SD</i></span><strong id="rRedMean">–</strong></div>
+      </div>
+    </div>
+    <div class="fiber" id="fiberBox">
+      
+    </div>
+  </div>
+
+  <div class="tablewrap">
+    <div class="tablehead">
+      <h2>每根纤维<span class="en i">Per-fiber data</span></h2>
+      <select id="tFilter" style="width:auto"><option value="all">全部纤维 All</option><option value="inj">仅损伤区 Injured</option><option value="non">仅非损伤区 Non-injured</option><option value="ex">已排除 Excluded</option></select>
+      <button class="btn" id="expCsv" type="button" disabled>导出CSV Export CSV</button>
+      <button class="btn" id="expPng" type="button" disabled>导出叠加图PNG Export overlay PNG</button>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>编号<br>ID</th><th>面积 µm²<br>Area</th><th>中心区核面积 µm²<br>Core nuclear area</th><th>红色占比 %<br>Red fraction</th><th>判定<br>Classification</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="hint" id="tNote" style="margin-top:6px"></div>
+  </div>
+
+  <details class="notes">
+    <summary>方法说明与注意事项<span class="en i">Method and notes</span></summary>
+    <p>纤维分割：WGA通道扣除背景并平滑后按阈值得到膜掩膜，取膜以外的连通区域为纤维，再按面积范围过滤。中央核判定：把每根纤维的轮廓向内缩一段距离得到中心区，中心区内细胞核掩膜面积达到设定值即判为中央核纤维。损伤区为全部中央核纤维的并集。</p>
+    <p lang="en">Fiber segmentation: the WGA channel is background-subtracted, smoothed and thresholded into a membrane mask; connected regions outside the membrane are fibers, filtered by area. Central nuclei: each fiber outline is shrunk inward to give a core; a fiber whose core contains at least the set nuclear area is centrally nucleated. The injured region is the union of all centrally nucleated fibers.</p>
+    <p>红色阳性面积只统计纤维内部的像素，纤维间隙中的红色信号不计入。自动阈值使用Otsu法；红色信号稀疏时自动阈值可能偏低，请打开"红色阳性像素"叠加层核对后手动调整。</p>
+    <p lang="en">Red-positive area counts only pixels inside fibers; red signal in the interstitium is ignored. Automatic thresholds use Otsu's method, which can run low when red signal is sparse; check the "Red+ pixels" overlay and adjust manually.</p>
+    <p>同一批实验请使用相同的参数，并先用几张图人工核对自动判定结果。统计时以动物为单位，不要以切片或视野为单位。</p>
+    <p>无纤维损伤区：手动圈画的区域和自动识别的DAPI密集区中，不属于任何已识别纤维的像素计入损伤区面积，其中的红色像素计入红色阳性面积。汇总中会单独列出这部分面积。</p>
+    <p lang="en">Fiber-free injured areas: pixels in drawn regions or auto-detected DAPI-dense areas that do not belong to any detected fiber are added to the injured area, and their red pixels to the red+ area. The summary lists this part separately.</p>
+    <p>手动圈画：漏识别的纤维可用"圈画纤维"沿纤维内缘圈出，圈内尚未属于其他纤维的像素组成一根新纤维，并按同样规则判定中央核和红色阳性；漏掉的红色信号可用"圈画红色阳性"圈出，圈内像素计为红色阳性。所有圈画都记录在CSV中，"撤销"按圈画顺序逐个删除。</p>
+    <p lang="en">Manual drawing: trace a missed fiber along its inner edge with "Draw fiber"; pixels inside that do not belong to another fiber form a new fiber, classified by the same rules. Outline missed red signal with "Draw red+"; pixels inside count as red+. All drawings are recorded in the CSV, and Undo removes them in reverse order.</p>
+    <p lang="en">Use the same parameters across an experiment and verify the automatic calls on a few images first. Treat the animal, not the section or field, as the statistical unit.</p>
+  </details>
+</main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+const VERSION="1.10.0";
+const $=id=>document.getElementById(id);
+const tick=()=>new Promise(r=>setTimeout(r,0));
+const S={src:null,work:null,seg:null,nuc:null,mk:null,cls:null,ov:new Map(),sel:0,zoom:1,keys:{},busy:false,rejOv:new Map(),polys:[],dense:null,extra:null,drawMode:null,cur:null};
+let dl=null;
+
+/* ---------- UI helpers ---------- */
+function status(zh,en,pct,err){const s=$('status');s.textContent=zh;if(en){const e=document.createElement('span');e.className='en';e.textContent=en;s.appendChild(e);}s.classList.toggle('err',!!err);if(pct!=null)$('prog').style.width=pct+'%';}
+const bi=(zh,en)=>{const e=new Error(zh);e.en=en;return e;};
+const toEn=n=>n.replace(/第(\d+)页/,'Page $1').replace('通道','channel').replace('红','Red').replace('绿','Green').replace('蓝','Blue').trim();
+let toastT;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2200);}
+const fmt=(v,d=1)=>Number.isFinite(v)?v.toLocaleString('zh-CN',{minimumFractionDigits:d,maximumFractionDigits:d}):'–';
+function fmtArea(um2){return um2>=1e5?fmt(um2/1e6,3)+' mm²':fmt(um2,0)+' µm²';}
+const num=id=>{const v=parseFloat($(id).value);return Number.isFinite(v)?v:0;};
+
+/* ---------- Image loading ---------- */
+function stretch16(vals){ // Uint16Array -> Uint8Array with 0.05/99.95 percentile
+  const n=vals.length,h=new Uint32Array(65536);for(let i=0;i<n;i++)h[vals[i]]++;
+  const lo=n*0.0005,hi=n*0.9995;let c=0,a=0,b=65535,fa=false;
+  for(let v=0;v<65536;v++){c+=h[v];if(!fa&&c>=lo){a=v;fa=true;}if(c>=hi){b=v;break;}}
+  if(b<=a)b=a+1;const k=255/(b-a),o=new Uint8Array(n);
+  for(let i=0;i<n;i++){const v=(vals[i]-a)*k;o[i]=v<0?0:v>255?255:v;}return o;
+}
+function stretchF(vals){
+  const n=vals.length,step=Math.max(1,Math.floor(n/200000)),s=[];for(let i=0;i<n;i+=step)if(Number.isFinite(vals[i]))s.push(vals[i]);
+  s.sort((x,y)=>x-y);const a=s[Math.floor(s.length*0.0005)]||0;let b=s[Math.floor(s.length*0.9995)]||1;if(b<=a)b=a+1;
+  const k=255/(b-a),o=new Uint8Array(n);for(let i=0;i<n;i++){const v=(vals[i]-a)*k;o[i]=v>0?(v>255?255:v):0;}return o;
+}
+function decodeTiff(buf){
+  if(!window.UTIF)throw bi('TIFF读取组件未能加载。请检查网络后刷新页面，或在Fiji中把图像另存为PNG再载入。','The TIFF reader failed to load. Check your connection and reload, or save the image as PNG in Fiji.');
+  const ifds=UTIF.decode(buf);const ch=[];let w=0,h=0,page=0;const RGB=['红','绿','蓝'];
+  const conv=(ifd,spp,s,planar)=>{ // one sample of a decoded ifd -> Uint8Array
+    const bps=ifd.t258?ifd.t258[0]:1,sf=ifd.t339?ifd.t339[0]:1,ph=ifd.t262?ifd.t262[0]:1,n=w*h,d=ifd.data;
+    const dv=new DataView(d.buffer,d.byteOffset,d.byteLength),ix=i=>planar?i:i*spp+s;let o;
+    if(bps===8){o=new Uint8Array(n);for(let i=0;i<n;i++)o[i]=d[ix(i)];if(ph===0)for(let i=0;i<n;i++)o[i]=255-o[i];}
+    else if(bps===16){const v=new Uint16Array(n);for(let i=0;i<n;i++)v[i]=dv.getUint16(ix(i)*2,true);o=stretch16(v);}
+    else if(bps===32&&sf===3){const v=new Float32Array(n);for(let i=0;i<n;i++)v[i]=dv.getFloat32(ix(i)*4,true);o=stretchF(v);}
+    return o;};
+  for(const ifd of ifds){
+    if(ch.length>=8)break;
+    if(ifd.t254&&(ifd.t254[0]&1))continue;
+    if(!ifd.t256)continue;
+    const iw=ifd.t256[0],ih=ifd.t257?ifd.t257[0]:0;
+    if(!w){w=iw;h=ih;}else if(iw!==w||ih!==h)continue;
+    page++;
+    const spp=ifd.t277?ifd.t277[0]:1,bps=ifd.t258?ifd.t258[0]:1,ph=ifd.t262?ifd.t262[0]:1,sf=ifd.t339?ifd.t339[0]:1;
+    const ok=bps===8||bps===16||(bps===32&&sf===3);
+    const nm=s=>spp>=3?(ifds.length>1?`第${page}页 ${RGB[s]}`:RGB[s]):`第${page}页 通道`;
+    if(spp>1&&ifd.t284&&ifd.t284[0]===2&&ok){ // planar: split into one pseudo-page per sample
+      const offK=ifd.t273?'t273':'t324',cntK=ifd.t279?'t279':'t325',per=ifd[offK].length/spp;
+      for(let s=0;s<Math.min(spp,3);s++){
+        const o=Object.assign({},ifd);o.t258=[bps];o.t277=[1];o.t284=[1];o.t262=[1];delete o.data;
+        o[offK]=ifd[offK].slice(s*per,(s+1)*per);if(ifd[cntK])o[cntK]=ifd[cntK].slice(s*per,(s+1)*per);
+        try{UTIF.decodeImage(buf,o,ifds);}catch(e){continue;}if(!o.data)continue;
+        const c=conv(o,1,0,true);if(c)ch.push({name:nm(s),data:c});
+      }
+      continue;
+    }
+    try{UTIF.decodeImage(buf,ifd,ifds);}catch(e){continue;}
+    if(!ifd.data)continue;
+    if(ph===3||!ok){const rgba=UTIF.toRGBA8(ifd),n=w*h;for(let s=0;s<3;s++){const o=new Uint8Array(n);for(let i=0;i<n;i++)o[i]=rgba[i*4+s];ch.push({name:`第${page}页 ${RGB[s]}`,data:o});}continue;}
+    for(let s=0;s<Math.min(spp,spp>=3?3:1);s++){const c=conv(ifd,spp,s,false);if(c)ch.push({name:nm(s),data:c});}
+  }
+  if(!ch.length)throw bi('没有在这个TIFF中找到可读取的图像。请在Fiji中另存为普通TIFF或PNG后重试。','No readable image found in this TIFF. Save it as a standard TIFF or PNG in Fiji and try again.');
+  const out={w,h,ch,pre:1};
+  try{const u=new Uint8Array(buf),key=new TextEncoder().encode('<Calibration Type="System.Double">');let at=-1;
+    for(let i=0;i<u.length-key.length&&at<0;i++){if(u[i]!==key[0])continue;let ok=true;for(let j=1;j<key.length;j++)if(u[i+j]!==key[j]){ok=false;break;}if(ok)at=i+key.length;}
+    if(at>0){let s2='';for(let i=at;i<at+30&&u[i]!==60;i++)s2+=String.fromCharCode(u[i]);const dv2=new DataView(new ArrayBuffer(8));dv2.setBigInt64(0,BigInt(s2.trim()),true);const nm=dv2.getFloat64(0,true);
+      if(nm>10&&nm<100000)out.pxUm=nm/1000;}}catch(e){}
+  return out;
+}
+async function decodeBitmap(file){
+  let bmp;try{bmp=await createImageBitmap(file);}catch(e){throw bi('无法解码这张图像。请确认文件是PNG、JPG或TIFF。','This image could not be decoded. Use a PNG, JPG or TIFF file.');}
+  const W0=bmp.width,H0=bmp.height,pre=Math.max(1,Math.sqrt(W0*H0/16e6));
+  const w=Math.round(W0/pre),h=Math.round(H0/pre);
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});
+  x.drawImage(bmp,0,0,w,h);const id=x.getImageData(0,0,w,h).data,n=w*h;
+  const ch=[0,1,2].map(s=>{const o=new Uint8Array(n);for(let i=0;i<n;i++)o[i]=id[i*4+s];return o;});
+  return {w,h,pre:W0/w,ch:[{name:'红',data:ch[0]},{name:'绿',data:ch[1]},{name:'蓝',data:ch[2]}]};
+}
+function guessChannels(ch){
+  const names=ch.map(c=>c.name);const find=k=>names.findIndex(n=>n.endsWith(k));
+  if(find('红')>=0&&find('绿')>=0&&find('蓝')>=0)return {mem:find('绿'),nuc:find('蓝'),mk:find('红')};
+  return {nuc:0,mem:Math.min(1,ch.length-1),mk:Math.min(2,ch.length-1)};
+}
+function setSource(src,label){
+  S.name=label;S.src=src;$('diag').textContent='';S.work=S.seg=S.nuc=S.mk=S.cls=null;S.ov.clear();S.rejOv.clear();S.sel=0;S.keys={};S.polys=[];S.dense=S.extra=null;$('drawBtn').disabled=false;updatePolyUI();
+  const g=guessChannels(src.ch);
+  for(const [id,k] of [['chMem','mem'],['chNuc','nuc'],['chMk','mk']]){
+    const s=$(id);s.innerHTML='';src.ch.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=c.name+'  '+toEn(c.name);s.appendChild(o);});s.value=g[k];
+  }
+  $('meta').textContent=`${label}：${Math.round(src.w*src.pre)} × ${Math.round(src.h*src.pre)} 像素，${src.ch.length} 个通道`+(src.pre>1.01?`（已按 ${fmt(src.pre,2)} 倍缩小载入）`:'');
+  const me=document.createElement('span');me.className='en';me.textContent=`${Math.round(src.w*src.pre)} × ${Math.round(src.h*src.pre)} px, ${src.ch.length} channels`+(src.pre>1.01?` (loaded at 1/${fmt(src.pre,2)} size)`:'');$('meta').appendChild(me);
+  if(src.pxUm){$('pxUm').value=src.pxUm.toFixed(4);src.pxSrc='meta';const me2=document.createElement('span');me2.className='en';me2.style.color='var(--ink)';me2.textContent=`已从Keyence元数据读取像素尺寸 ${src.pxUm.toFixed(4)} µm/像素。 Pixel size read from Keyence metadata.`;$('meta').appendChild(me2);}
+  else{const me2=document.createElement('span');me2.className='en';me2.style.color='var(--warn)';me2.textContent='图像中没有像素尺寸信息，请手动填写。 No pixel size in the file; enter it manually.';$('meta').appendChild(me2);}
+  $('run').disabled=false;updateWorkInfo();prepareWork();S.zoom=0;render();fit();showResults();
+  status('图像已载入。检查通道和像素尺寸后点"运行分析"。','Image loaded. Check the channels and pixel size, then click Run analysis.',0);
+}
+async function loadFile(file){
+  try{
+    status('正在读取 '+file.name+' …','Reading '+file.name+' …',5);await tick();
+    const buf=await file.arrayBuffer(),b=new Uint8Array(buf,0,4);
+    const big=(b[0]===0x49&&b[1]===0x49&&b[2]===43)||(b[0]===0x4D&&b[1]===0x4D&&b[3]===43);
+    const tif=(b[0]===0x49&&b[1]===0x49&&b[2]===42)||(b[0]===0x4D&&b[1]===0x4D&&b[3]===42);
+    if(big)throw bi('这是BigTIFF格式（常见于超大拼接图），浏览器无法读取。请在Fiji中用 Image › Scale 缩小后另存为普通TIFF或PNG。','This is a BigTIFF (common for very large stitched images), which browsers cannot read. Downscale it in Fiji with Image › Scale and save as a standard TIFF or PNG.');
+    const src=tif?decodeTiff(buf):await decodeBitmap(file);
+    setSource(src,file.name);
+  }catch(e){console.error(e);status(e.message||'读取失败。',e.en||(e.message?'':'Reading failed.'),0,true);}
+}
+
+/* ---------- Demo image ---------- */
+function makeDemo(){
+  const w=1400,h=1000,n=w*h;let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const pts=[],G=64;for(let gy=-1;gy<=h/G+1;gy++)for(let gx=-1;gx<=w/G+1;gx++){
+    const x=(gx+.5)*G+(rnd()-.5)*G*.7,y=(gy+.5)*G+(rnd()-.5)*G*.7;
+    const inj=Math.hypot(x-620,y-470)<330;pts.push({x,y,inj,red:inj&&rnd()<.65});}
+  // injured zone: subdivide with extra small fibers
+  const extra=[];for(const p of pts)if(p.inj)for(let k=0;k<2;k++){const a=rnd()*6.28,r=G*.33;extra.push({x:p.x+Math.cos(a)*r,y:p.y+Math.sin(a)*r,inj:true,red:rnd()<.6});}
+  const P=pts.concat(extra),gw=Math.ceil(w/G)+4,grid=new Map();
+  P.forEach((p,i)=>{const k=Math.floor(p.x/G+2)+Math.floor(p.y/G+2)*gw;(grid.get(k)||grid.set(k,[]).get(k)).push(i);});
+  const near=(x,y)=>{let b1=1e9,b2=1e9,i1=-1;const cx=Math.floor(x/G+2),cy=Math.floor(y/G+2);
+    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const a=grid.get(cx+dx+(cy+dy)*gw);if(!a)continue;for(const i of a){const d=Math.hypot(P[i].x-x,P[i].y-y);if(d<b1){b2=b1;b1=d;i1=i;}else if(d<b2)b2=d;}}
+    return [i1,b2-b1];};
+  const R=new Float32Array(n),Gc=new Float32Array(n),B=new Float32Array(n),own=new Int32Array(n);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,[k,gap]=near(x,y);own[i]=k;
+    const p=P[k];Gc[i]=gap<2.2?190:gap<3.5?80:22;if(p.red&&gap>3)R[i]=150;
+    if(Math.hypot(x-470,y-560)<115){Gc[i]=40;R[i]=(x+y)%7<1?90:0;}}
+  const disk=(cx,cy,r,v)=>{for(let y=Math.max(0,cy-r|0);y<=Math.min(h-1,cy+r);y++)for(let x=Math.max(0,cx-r|0);x<=Math.min(w-1,cx+r);x++)if((x-cx)**2+(y-cy)**2<=r*r)B[y*w+x]=v;};
+  for(let k=0;k<P.length;k++){const p=P[k];if(p.x<0||p.y<0||p.x>=w||p.y>=h)continue;
+    if(p.inj){if(rnd()<.85)disk(p.x,p.y,4.5,220);}
+    const m=p.inj?1:2+(rnd()*2|0);
+    for(let j=0;j<m;j++){const a=rnd()*6.28;let t=2;while(t<80){const x=p.x+Math.cos(a)*t|0,y=p.y+Math.sin(a)*t|0;if(x<0||y<0||x>=w||y>=h||own[y*w+x]!==k)break;t++;}
+      const t2=t-3.5;if(t2>6)disk(p.x+Math.cos(a)*t2,p.y+Math.sin(a)*t2,2.6,210);}}
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(Math.hypot(x-620,y-470)<330&&Gc[i]<100&&rnd()<.004)disk(x,y,3,200);}
+  for(let k=0;k<260;k++){const a=rnd()*6.283,r=Math.sqrt(rnd())*108;disk(470+Math.cos(a)*r,560+Math.sin(a)*r,3.2,215);}
+  const out=[R,Gc,B].map(a=>{gauss(a,w,h,1.2);const o=new Uint8Array(n);for(let i=0;i<n;i++){const v=a[i]+(rnd()-.5)*24+8;o[i]=v<0?0:v>255?255:v;}return o;});
+  setSource({w,h,pre:1,ch:[{name:'红',data:out[0]},{name:'绿',data:out[1]},{name:'蓝',data:out[2]}]},'示例图 Sample');
+  $('pxUm').value='0.65';
+}
+
+/* ---------- Image processing ---------- */
+function boxH(s,d,w,h,r){const k=1/(2*r+1);for(let y=0;y<h;y++){const o=y*w;let a=0;for(let j=-r;j<=r;j++)a+=s[o+(j<0?0:j>=w?w-1:j)];
+  for(let x=0;x<w;x++){d[o+x]=a*k;const ad=x+r+1,sb=x-r;a+=s[o+(ad>=w?w-1:ad)]-s[o+(sb<0?0:sb)];}}}
+function boxV(s,d,w,h,r){const k=1/(2*r+1);for(let x=0;x<w;x++){let a=0;for(let j=-r;j<=r;j++)a+=s[(j<0?0:j>=h?h-1:j)*w+x];
+  for(let y=0;y<h;y++){d[y*w+x]=a*k;const ad=y+r+1,sb=y-r;a+=s[(ad>=h?h-1:ad)*w+x]-s[(sb<0?0:sb)*w+x];}}}
+function gauss(f,w,h,sig){if(!(sig>0.3))return f;const r=Math.max(1,Math.round((Math.sqrt(4*sig*sig+1)-1)/2));const t=new Float32Array(f.length);
+  for(let i=0;i<3;i++){boxH(f,t,w,h,r);boxV(t,f,w,h,r);}return f;}
+function subBg(f,w,h,R){
+  if(!(R>=2))return f;const b=Math.max(2,Math.round(R/2)),sw=Math.ceil(w/b),sh=Math.ceil(h/b),sm=new Float32Array(sw*sh).fill(1e9);
+  for(let y=0;y<h;y++){const r=((y/b)|0)*sw,o=y*w;for(let x=0;x<w;x++){const i=r+((x/b)|0),v=f[o+x];if(v<sm[i])sm[i]=v;}}
+  const t=new Float32Array(sm.length);for(let k=0;k<2;k++){boxH(sm,t,sw,sh,1);boxV(t,sm,sw,sh,1);}
+  const x0=new Int32Array(w),x1=new Int32Array(w),fx=new Float32Array(w);
+  for(let x=0;x<w;x++){let g=(x+.5)/b-.5;if(g<0)g=0;const a=Math.min(sw-1,g|0);x0[x]=a;x1[x]=Math.min(sw-1,a+1);fx[x]=Math.min(1,g-a);}
+  for(let y=0;y<h;y++){let g=(y+.5)/b-.5;if(g<0)g=0;const a=Math.min(sh-1,g|0),c=Math.min(sh-1,a+1),fy=Math.min(1,g-a),ra=a*sw,rc=c*sw,o=y*w;
+    for(let x=0;x<w;x++){const top=sm[ra+x0[x]]*(1-fx[x])+sm[ra+x1[x]]*fx[x],bot=sm[rc+x0[x]]*(1-fx[x])+sm[rc+x1[x]]*fx[x];
+      const v=f[o+x]-(top*(1-fy)+bot*fy);f[o+x]=v>0?v:0;}}
+  return f;
+}
+function otsu(f){const hst=new Float64Array(256);for(let i=0;i<f.length;i++){let v=f[i]+.5|0;if(v>255)v=255;hst[v]++;}
+  const n=f.length;let sum=0;for(let i=0;i<256;i++)sum+=i*hst[i];let sB=0,wB=0,best=0,t=0;
+  for(let i=0;i<256;i++){wB+=hst[i];if(!wB)continue;const wF=n-wB;if(!wF)break;sB+=i*hst[i];const mB=sB/wB,mF=(sum-sB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>best){best=v;t=i;}}
+  return t;}
+function toF(u){const f=new Float32Array(u.length);for(let i=0;i<u.length;i++)f[i]=u[i];return f;}
+function resample(u8,w,h,W,H){ // smooth, area-like resampling to an arbitrary size
+  const c1=document.createElement('canvas');c1.width=w;c1.height=h;const x1=c1.getContext('2d'),id=x1.createImageData(w,h),d=id.data;
+  for(let i=0,j=0;i<u8.length;i++,j+=4){const v=u8[i];d[j]=d[j+1]=d[j+2]=v;d[j+3]=255;}x1.putImageData(id,0,0);
+  const c2=document.createElement('canvas');c2.width=W;c2.height=H;const x2=c2.getContext('2d',{willReadFrequently:true});x2.imageSmoothingEnabled=true;x2.imageSmoothingQuality='high';x2.drawImage(c1,0,0,W,H);
+  const o=x2.getImageData(0,0,W,H).data,r=new Uint8Array(W*H);for(let i=0;i<r.length;i++)r[i]=o[i*4];return r;
+}
+function downsample(u,w,h,k){if(k===1)return u;const W=Math.floor(w/k),H=Math.floor(h/k),o=new Uint8Array(W*H),kk=k*k;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){let a=0;for(let j=0;j<k;j++){const r=(y*k+j)*w+x*k;for(let i=0;i<k;i++)a+=u[r+i];}o[y*W+x]=a/kk;}return o;}
+function dilate(m,w,h,k){let a=m.slice(),b=new Uint8Array(m.length);
+  for(let it=0;it<k;it++){for(let y=0;y<h;y++){const o=y*w;for(let x=0;x<w;x++){const i=o+x;if(a[i]){b[i]=1;continue;}
+    let v=0;for(let dy=-1;dy<=1&&!v;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx>=0&&xx<w&&a[yy*w+xx]){v=1;break;}}}b[i]=v;}}
+    const t=a;a=b;b=t;}return a;}
+function label(bg,w,h){ // label pixels where bg==0, 4-connectivity
+  const N=w*h,L=new Int32Array(N);let par=new Int32Array(1024),nx=1;
+  const find=x=>{while(par[x]!==x){par[x]=par[par[x]];x=par[x];}return x;};
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(bg[i])continue;const u=y?L[i-w]:0,l=x?L[i-1]:0;
+    if(!u&&!l){if(nx>=par.length){const p=new Int32Array(par.length*2);p.set(par);par=p;}par[nx]=nx;L[i]=nx++;}
+    else if(u&&l){const a=find(u),b=find(l);if(a!==b){if(a<b){par[b]=a;L[i]=a;}else{par[a]=b;L[i]=b;}}else L[i]=a;}
+    else L[i]=u||l;}
+  const map=new Int32Array(nx);let c=0;for(let l=1;l<nx;l++){const r=find(l);map[l]=r===l?++c:map[r];}
+  for(let i=0;i<N;i++)if(L[i])L[i]=map[L[i]];return {L,n:c};}
+function fillHoles(L,w,h){ // assign enclosed unlabeled pockets to the single fiber that surrounds them
+  const N=w*h,z=new Uint8Array(N);for(let i=0;i<N;i++)z[i]=L[i]?1:0;
+  const {L:H,n}=label(z,w,h);if(!n)return;const own=new Int32Array(n+1),bad=new Uint8Array(n+1);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,c=H[i];if(!c||bad[c])continue;
+    if(!x||!y||x===w-1||y===h-1){bad[c]=1;continue;}
+    const nb=[L[i-1],L[i+1],L[i-w],L[i+w]];for(const v of nb){if(!v)continue;if(!own[c])own[c]=v;else if(own[c]!==v){bad[c]=1;break;}}}
+  for(let i=0;i<N;i++){const c=H[i];if(c&&!bad[c]&&own[c])L[i]=own[c];}
+}
+function grow(L,mem,dil,w,h,k){for(let it=0;it<k;it++){const p=L.slice();let ch=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(p[i]||mem[i]||!dil[i])continue;let v=0;
+    if(x>0&&p[i-1])v=p[i-1];else if(x<w-1&&p[i+1])v=p[i+1];else if(y>0&&p[i-w])v=p[i-w];else if(y<h-1&&p[i+w])v=p[i+w];if(v){L[i]=v;ch++;}}
+  if(!ch)break;}}
+
+/* ---------- Pipeline ---------- */
+function params(){return{
+  ch:{mem:+$('chMem').value,nuc:+$('chNuc').value,mk:+$('chMk').value},px:num('pxUm'),scale:$('scale').value,
+  mem:{bg:num('memBg'),sig:num('memSig'),auto:$('memAuto').checked,thr:num('memThr'),dil:Math.round(num('memDil')),aMin:num('aMin'),aMax:num('aMax'),nb:$('noBorder').checked,dil2:$('dil2On').checked?Math.round(num('memDil2')):-1,redKeep:$('redKeep').checked,shapeMax:num('shapeMax'),nucMax:num('nucMax'),riMin:num('riMin'),solMin:num('solMin')},
+  nuc:{bg:num('nucBg'),auto:$('nucAuto').checked,thr:num('nucThr')},
+  mk:{bg:num('mkBg'),auto:$('mkAuto').checked,thr:num('mkThr')},
+  cls:{inset:num('inset'),minNuc:num('minNuc'),frac:num('mkFrac'),incl:$('inclMk').checked,mode:$('mkMode').value,band:num('mkBand')},
+  rs:{on:$('rsOn').checked,minA:num('rsMin'),maxA:num('rsMax'),auto:$('rsAuto').checked,thr:num('rsThr')},
+  dn:{auto:$('dnAuto').checked,r:num('dnR'),pct:num('dnPct'),min:num('dnMin'),inc:{inter:$('incInter').checked,large:$('incLarge').checked,small:$('incSmall').checked,border:$('incBorder').checked}}};}
+function scaleFactor(){const v=$('scale').value;if(!S.src)return 1;if(v==='target'){const nat=num('pxUm')*S.src.pre,t=num('targetUm');return (t>0&&nat>0)?t/nat:1;}if(v!=='auto')return +v;return Math.max(1,Math.ceil(Math.sqrt(S.src.w*S.src.h/20e6)));}
+function updateWorkInfo(){if(!S.src)return;const k=scaleFactor(),um=num('pxUm')*S.src.pre*k;
+  $('workInfo').textContent=`处理尺寸 ${Math.floor(S.src.w/k)} × ${Math.floor(S.src.h/k)} 像素，每像素 ${fmt(um,3)} µm。`;const e=document.createElement('span');e.className='en';e.textContent=`Working size ${Math.floor(S.src.w/k)} × ${Math.floor(S.src.h/k)} px, ${fmt(um,3)} µm per pixel.`;$('workInfo').appendChild(e);}
+function prepareWork(){const p=params(),k=scaleFactor(),key=JSON.stringify([p.ch,k]);
+  if(S.keys.work===key&&S.work)return false;const src=S.src,int=Math.abs(k-Math.round(k))<1e-9;
+  const w=int?Math.floor(src.w/k):Math.max(1,Math.round(src.w/k)),h=int?Math.floor(src.h/k):Math.max(1,Math.round(src.h/k));
+  const rs=u=>int?downsample(u,src.w,src.h,Math.round(k)):resample(u,src.w,src.h,w,h);
+  S.work={w,h,k:int?Math.round(k):src.w/w,mem:rs(src.ch[p.ch.mem].data),nuc:rs(src.ch[p.ch.nuc].data),mk:rs(src.ch[p.ch.mk].data)};
+  S.keys.work=key;S.keys.seg=S.keys.nuc=S.keys.mk=S.keys.dn=null;S.seg=S.nuc=S.mk=S.cls=S.dense=S.extra=null;S.sel=0;S.ov.clear();return true;}
+const umPx=()=>num('pxUm')*S.src.pre*S.work.k;
+
+function solidity(L,bnd,area,n,w,h){ // area / convex-hull area per label, from boundary pixels
+  const cnt=new Int32Array(n+2);for(let i=0;i<L.length;i++){const l=L[i];if(l&&bnd[i])cnt[l+1]++;}
+  for(let l=1;l<=n+1;l++)cnt[l]+=cnt[l-1];const off=cnt.slice(),P=new Int32Array(cnt[n+1]*2);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=L[i];if(!l||!bnd[i])continue;const k=off[l]++;P[2*k]=x;P[2*k+1]=y;}
+  const out=new Float32Array(n+1).fill(1),cr=(ox,oy,ax,ay,bx,by)=>(ax-ox)*(by-oy)-(ay-oy)*(bx-ox);
+  for(let l=1;l<=n;l++){const s=cnt[l],e=cnt[l+1],m=e-s;if(m<3)continue;const pts=[];for(let k=s;k<e;k++)pts.push([P[2*k],P[2*k+1]]);
+    pts.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const lo=[],up=[];
+    for(const p of pts){while(lo.length>=2&&cr(lo[lo.length-2][0],lo[lo.length-2][1],lo[lo.length-1][0],lo[lo.length-1][1],p[0],p[1])<=0)lo.pop();lo.push(p);}
+    for(let i=pts.length-1;i>=0;i--){const p=pts[i];while(up.length>=2&&cr(up[up.length-2][0],up[up.length-2][1],up[up.length-1][0],up[up.length-1][1],p[0],p[1])<=0)up.pop();up.push(p);}
+    const H=lo.slice(0,-1).concat(up.slice(0,-1));let A=0,per=0;for(let i=0;i<H.length;i++){const a=H[i],b=H[(i+1)%H.length];A+=a[0]*b[1]-b[0]*a[1];per+=Math.hypot(b[0]-a[0],b[1]-a[1]);}
+    const hullPx=Math.abs(A)/2+per/2+1;out[l]=Math.min(1,area[l]/hullPx);}
+  return out;
+}
+async function segment(P,um,nucM,redM){
+  const {w,h}=S.work,N=w*h;let f=toF(S.work.mem);
+  status('扣除WGA背景…','Subtracting WGA background…',15);await tick();subBg(f,w,h,P.bg/um);
+  status('平滑与阈值分割…','Smoothing and thresholding…',28);await tick();gauss(f,w,h,P.sig);
+  const thr=P.auto?otsu(f):P.thr;const mem=new Uint8Array(N);for(let i=0;i<N;i++)mem[i]=f[i]>thr?1:0;f=null;
+  const bar=mem;
+  status('识别纤维…','Detecting fibers…',40);await tick();
+  const dil=P.dil>0?dilate(bar,w,h,P.dil):bar;const {L,n}=label(dil,w,h);
+  if(P.dil>0)grow(L,mem,dil,w,h,2*P.dil+1);
+  fillHoles(L,w,h);
+  let nAll=n;
+  if(P.dil2>=0&&P.dil2<P.dil){ // second, finer pass: recover small fibers erased by the larger dilation
+    status('补充分割小纤维…','Second pass for small fibers…',45);await tick();
+    const d2=P.dil2>0?dilate(bar,w,h,P.dil2):bar,{L:L2,n:n2}=label(d2,w,h);if(P.dil2>0)grow(L2,mem,d2,w,h,2*P.dil2+1);fillHoles(L2,w,h);
+    const a2=new Int32Array(n2+1),ov=new Int32Array(n2+1);for(let i=0;i<N;i++){const c=L2[i];if(!c)continue;a2[c]++;if(L[i])ov[c]++;}
+    const nid=new Int32Array(n2+1);for(let c=1;c<=n2;c++)if(a2[c]&&ov[c]/a2[c]<0.1)nid[c]=++nAll;
+    for(let i=0;i<N;i++){const c=L2[i];if(c&&nid[c]&&!L[i])L[i]=nid[c];}
+  }
+  status('计算纤维内距离…','Computing distances inside fibers…',50);await tick();
+  const bnd=new Uint8Array(N),dist=new Uint16Array(N);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=L[i];if(!l)continue;
+    if(!x||!y||x===w-1||y===h-1||L[i-1]!==l||L[i+1]!==l||L[i-w]!==l||L[i+w]!==l){bnd[i]=1;}else dist[i]=65535;}
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;let d=dist[i];if(!d)continue;
+    let c=dist[i-1]+3;if(c<d)d=c;c=dist[i-w]+3;if(c<d)d=c;c=dist[i-w-1]+4;if(c<d)d=c;c=dist[i-w+1]+4;if(c<d)d=c;dist[i]=d;}
+  for(let y=h-2;y>0;y--)for(let x=w-2;x>0;x--){const i=y*w+x;let d=dist[i];if(!d)continue;
+    let c=dist[i+1]+3;if(c<d)d=c;c=dist[i+w]+3;if(c<d)d=c;c=dist[i+w+1]+4;if(c<d)d=c;c=dist[i+w-1]+4;if(c<d)d=c;dist[i]=d;}
+  status('筛选纤维…','Filtering fibers…',58);await tick();
+  const area=new Int32Array(nAll+1),bd=new Uint8Array(nAll+1),sx=new Float64Array(nAll+1),sy=new Float64Array(nAll+1),md=new Uint16Array(nAll+1),nc=new Int32Array(nAll+1),rc=new Int32Array(nAll+1);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=L[i];if(!l)continue;area[l]++;sx[l]+=x;sy[l]+=y;if(!x||!y||x===w-1||y===h-1)bd[l]=1;
+    if(dist[i]>md[l])md[l]=dist[i];if(nucM&&nucM[i])nc[l]++;if(redM&&redM[i])rc[l]++;}
+  const pa=um*um,map=new Int32Array(nAll+1),rmap=new Int32Array(nAll+1),fib=[null],rej=[null];
+  const sol=P.solMin>0?solidity(L,bnd,area,nAll,w,h):null;
+  for(let l=1;l<=nAll;l++){const a=area[l]*pa,ri=md[l]/3+0.5,shape=area[l]/(Math.PI*ri*ri),nf=nc[l]/area[l]*100,so=sol?sol[l]:1;let why='';
+    if(P.nb&&bd[l])why=a>P.aMax?'bg':'border';else if(a<P.aMin)why='small';else if(a>P.aMax)why='large';
+    else if(P.riMin>0&&ri*um<P.riMin)why='thin';
+    else if(sol&&so<P.solMin)why='concave';
+    else if(P.shapeMax>0&&shape>P.shapeMax)why='shape';else if(P.nucMax>0&&nucM&&nf>P.nucMax&&!(P.redKeep&&rc[l]/area[l]>=0.5))why='nuclei';
+    if(!why){map[l]=fib.length;fib.push({id:fib.length,area:area[l],cx:sx[l]/area[l],cy:sy[l]/area[l]});}
+    else{rmap[l]=rej.length;rej.push({area:a,why,show:why!=='bg',shape,nf,ri:ri*um,so});}}
+  const R=new Int32Array(N);
+  for(let i=0;i<N;i++){const l=L[i];if(l){const m=map[l];L[i]=m;if(!m){R[i]=rmap[l];bnd[i]=0;dist[i]=0;}}}
+  const M=fib.length-1,maxD=new Uint16Array(M+1);for(let l=1;l<=nAll;l++)if(map[l])maxD[map[l]]=md[l];
+  return {L,n:M,fib,bnd,dist,maxD,thr,R,rej,mem};
+}
+async function mask(u8,P,um,msg,pct){const {w,h}=S.work;status(msg[0],msg[1],pct);await tick();
+  const f=toF(u8);subBg(f,w,h,P.bg/um);gauss(f,w,h,1);const thr=P.auto?otsu(f):P.thr,m=new Uint8Array(f.length);
+  for(let i=0;i<f.length;i++)m[i]=f[i]>thr?1:0;return {m,thr};}
+
+function computeDense(){
+  const p=params().dn;S.dense=null;if(!p.auto||!S.seg||!S.nuc)return;
+  const {w,h}=S.work,N=w*h,L=S.seg.L,um=umPx(),rp=Math.max(1,Math.round(p.r/um));
+  const f=toF(S.nuc.m),t=new Float32Array(N);for(let k=0;k<2;k++){boxH(f,t,w,h,rp);boxV(t,f,w,h,rp);}
+  const thr=p.pct/100,inv=new Uint8Array(N);for(let i=0;i<N;i++)inv[i]=(f[i]>=thr&&!L[i])?0:1;
+  const {L:C,n}=label(inv,w,h),cnt=new Int32Array(n+1);for(let i=0;i<N;i++)if(C[i])cnt[C[i]]++;
+  const minPx=p.min/(um*um),m=new Uint8Array(N);for(let i=0;i<N;i++){const c=C[i];if(c&&cnt[c]>=minPx)m[i]=1;}
+  S.dense=m;
+}
+let offc=null;
+const polysOf=t=>S.polys.filter(o=>o.t===t).map(o=>o.p);
+function rasterBox(P){ // polygon (source coords) -> mask over its bounding box at working resolution
+  const {w,h,k}=S.work;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const q of P){const x=q[0]/k,y=q[1]/k;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  const bx=Math.max(0,Math.floor(x0)),by=Math.max(0,Math.floor(y0)),ex=Math.min(w-1,Math.ceil(x1)),ey=Math.min(h-1,Math.ceil(y1)),bw=ex-bx+1,bh=ey-by+1;
+  if(bw<1||bh<1)return {bx,by,bw:0,bh:0,m:new Uint8Array(0)};
+  if(!offc)offc=document.createElement('canvas');offc.width=bw;offc.height=bh;const x=offc.getContext('2d',{willReadFrequently:true});
+  x.clearRect(0,0,bw,bh);x.fillStyle='#fff';x.beginPath();P.forEach((q,j)=>j?x.lineTo(q[0]/k-bx,q[1]/k-by):x.moveTo(q[0]/k-bx,q[1]/k-by));x.closePath();x.fill();
+  const d=x.getImageData(0,0,bw,bh).data,m=new Uint8Array(bw*bh);for(let i=0;i<m.length;i++)if(d[i*4+3]>127)m[i]=1;return {bx,by,bw,bh,m};
+}
+const rejCat=why=>why==='shape'||why==='nuclei'||why==='thin'||why==='concave'?'inter':why;
+function rejIncluded(id){const R0=S.seg&&S.seg.rej[id];if(!R0||R0.why==='bg')return false;if(S.rejOv.has(id))return S.rejOv.get(id);return !!params().dn.inc[rejCat(R0.why)];}
+function buildExtra(){
+  if(!S.seg){S.extra=null;return;}const {w,h}=S.work,N=w*h,L=S.seg.L;
+  const e=S.dense?S.dense.slice():new Uint8Array(N);
+  {const R=S.seg.R,rj=S.seg.rej,inc=new Uint8Array(rj.length);let any=false;for(let id=1;id<rj.length;id++)if(rejIncluded(id)){inc[id]=1;any=true;}
+    if(any)for(let i=0;i<N;i++){const rr=R[i];if(rr&&inc[rr])e[i]=1;}}
+  for(const P of polysOf('inj')){const b=rasterBox(P);for(let y=0;y<b.bh;y++)for(let x=0;x<b.bw;x++)if(b.m[y*b.bw+x])e[(b.by+y)*w+b.bx+x]=1;}
+  for(let i=0;i<N;i++)if(L[i])e[i]=0;
+  S.extra=e;
+}
+function addFiber(o){
+  const sg=S.seg,{w,h}=S.work,L=sg.L,id=sg.n+1;let x0=w,y0=h,x1=-1,y1=-1,a=0,sx=0,sy=0;
+  const take=(x,y,i)=>{L[i]=id;a++;sx+=x;sy+=y;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;};
+  if(o.rej){if(!(o.seg===sg))return false;const R=sg.R;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(R[i]===o.rej&&!L[i])take(x,y,i);}}
+  else{const b=rasterBox(o.p);for(let yy=0;yy<b.bh;yy++)for(let xx=0;xx<b.bw;xx++){if(!b.m[yy*b.bw+xx])continue;const x=b.bx+xx,y=b.by+yy,i=y*w+x;if(!L[i])take(x,y,i);}}
+  if(a<5){for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=y*w+x;if(L[i]===id)L[i]=0;}return false;}
+  finishLabel(sg,id,x0,y0,x1,y1,a,sx,sy,{drawn:true,conv:!!o.rej});sg.man=(sg.man||0)+1;return true;
+}
+function finishLabel(sg,id,x0,y0,x1,y1,a,sx,sy,extra){
+  const {w,h}=S.work,L=sg.L,bnd=sg.bnd,dist=sg.dist;
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=y*w+x;if(L[i]!==id)continue;
+    if(!x||!y||x===w-1||y===h-1||L[i-1]!==id||L[i+1]!==id||L[i-w]!==id||L[i+w]!==id){bnd[i]=1;dist[i]=0;}else{bnd[i]=0;dist[i]=65535;}}
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=y*w+x;if(L[i]!==id||!dist[i])continue;let d=dist[i],c;
+    c=dist[i-1]+3;if(c<d)d=c;c=dist[i-w]+3;if(c<d)d=c;c=dist[i-w-1]+4;if(c<d)d=c;c=dist[i-w+1]+4;if(c<d)d=c;dist[i]=d;}
+  let md=0;for(let y=y1;y>=y0;y--)for(let x=x1;x>=x0;x--){const i=y*w+x;if(L[i]!==id||!dist[i])continue;let d=dist[i],c;
+    c=dist[i+1]+3;if(c<d)d=c;c=dist[i+w]+3;if(c<d)d=c;c=dist[i+w+1]+4;if(c<d)d=c;c=dist[i+w-1]+4;if(c<d)d=c;dist[i]=d;if(d>md)md=d;}
+  if(sg.maxD.length<=id){const t=new Uint16Array(id+64);t.set(sg.maxD);sg.maxD=t;}sg.maxD[id]=md;
+  sg.fib.push(Object.assign({id,area:a,cx:sx/a,cy:sy/a,bb:[x0,y0,x1,y1]},extra||{}));sg.n=id;sg.ver=(sg.ver||0)+1;
+}
+function redSeedMask(P,um){ // stricter red mask: Otsu among pixels above the main red threshold
+  const {w,h}=S.work,N=w*h,f=toF(S.work.mk);subBg(f,w,h,params().mk.bg/um);gauss(f,w,h,1);
+  const t1=S.mk.thr;let t2=P.thr;
+  if(P.auto){const hst=new Float64Array(256);let n=0;for(let i=0;i<N;i++){const v=f[i]+.5|0;if(v>t1){hst[v>255?255:v]++;n++;}}
+    let sum=0;for(let i=0;i<256;i++)sum+=i*hst[i];let sB=0,wB=0,best=0;t2=t1;
+    for(let i=0;i<256;i++){wB+=hst[i];if(!wB)continue;const wF=n-wB;if(!wF)break;sB+=i*hst[i];const mB=sB/wB,mF=(sum-sB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>best){best=v;t2=i;}}}
+  const m=new Uint8Array(N);for(let i=0;i<N;i++)m[i]=f[i]>t2?1:0;return {m,thr:t2};
+}
+function addRedFibers(sg,red,P,um){ // small red+ objects outside detected fibers become fibers
+  const {w,h}=S.work,N=w*h,L=sg.L,pa=um*um,minPx=P.minA/pa,maxPx=P.maxA/pa;
+  // close small gaps in red rings (radius ~1.5 µm), staying outside detected fibers
+  const cr=Math.max(1,Math.round(1.5/um));let cl=new Uint8Array(N);for(let i=0;i<N;i++)cl[i]=(red[i]&&!L[i])?1:0;
+  cl=dilate(cl,w,h,cr);for(let i=0;i<N;i++)if(L[i])cl[i]=0;
+  {const inv=new Uint8Array(N);for(let i=0;i<N;i++)inv[i]=cl[i]?0:1;const di=dilate(inv,w,h,cr);for(let i=0;i<N;i++)cl[i]=di[i]?0:1;}
+  const nc0=new Uint8Array(N);for(let i=0;i<N;i++)nc0[i]=cl[i]?0:1;cl=null;
+  const {L:C,n:nc}=label(nc0,w,h);if(!nc)return 0;
+  const bad=new Uint8Array(nc+1),cnt=new Int32Array(nc+1),bx0=new Int32Array(nc+1).fill(w),by0=new Int32Array(nc+1).fill(h),bx1=new Int32Array(nc+1).fill(-1),by1=new Int32Array(nc+1).fill(-1);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,c=C[i];if(!c)continue;cnt[c]++;
+    if(x<bx0[c])bx0[c]=x;if(x>bx1[c])bx1[c]=x;if(y<by0[c])by0[c]=y;if(y>by1[c])by1[c]=y;
+    if((x>0&&L[i-1])||(x<w-1&&L[i+1])||(y>0&&L[i-w])||(y<h-1&&L[i+w]))bad[c]=1;}
+  for(let i=0;i<N;i++)nc0[i]=nc0[i]?0:1; // now 1 = candidate
+  const {L:Z,n:nz}=label(nc0,w,h),own=new Int32Array(nz+1),zb=new Uint8Array(nz+1),zf=new Uint8Array(nz+1),zc=new Int32Array(nz+1);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,z=Z[i];if(!z||zb[z])continue;zc[z]++;if(L[i])zf[z]=1;
+    if(!x||!y||x===w-1||y===h-1){zb[z]=1;continue;}
+    for(const j of [i-1,i+1,i-w,i+w]){const c=C[j];if(!c)continue;if(!own[z])own[z]=c;else if(own[z]!==c){zb[z]=1;break;}}}
+  const hole=new Uint8Array(nz+1);
+  for(let z=1;z<=nz;z++){if(zb[z]||!own[z])continue;if(zf[z]){bad[own[z]]=1;continue;}hole[z]=1;cnt[own[z]]+=zc[z];}
+  // object = component + its holes; inscribed radius and share lying on the WGA membrane
+  const ownerOf=i=>C[i]||(Z[i]&&hole[Z[i]]?own[Z[i]]:0),D=new Uint16Array(N),md=new Uint16Array(nc+1),onMem=new Int32Array(nc+1),mem=sg.mem;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,c=ownerOf(i);if(!c)continue;if(mem&&mem[i])onMem[c]++;
+    D[i]=(!x||!y||x===w-1||y===h-1||ownerOf(i-1)!==c||ownerOf(i+1)!==c||ownerOf(i-w)!==c||ownerOf(i+w)!==c)?0:65535;}
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;let d=D[i];if(!d)continue;let t=D[i-1]+3;if(t<d)d=t;t=D[i-w]+3;if(t<d)d=t;t=D[i-w-1]+4;if(t<d)d=t;t=D[i-w+1]+4;if(t<d)d=t;D[i]=d;}
+  for(let y=h-2;y>0;y--)for(let x=w-2;x>0;x--){const i=y*w+x;let d=D[i];if(!d)continue;let t=D[i+1]+3;if(t<d)d=t;t=D[i+w]+3;if(t<d)d=t;t=D[i+w+1]+4;if(t<d)d=t;t=D[i+w-1]+4;if(t<d)d=t;D[i]=d;
+    const c=ownerOf(i);if(c&&d>md[c])md[c]=d;}
+  const idOf=new Int32Array(nc+1);let id=sg.n;
+  for(let c=1;c<=nc;c++){if(bad[c])continue;const a=cnt[c];if(a<minPx||a>maxPx)continue;
+    const ri=md[c]/3+0.5;if(ri*um<2.5||a/(Math.PI*ri*ri)>3)continue;
+    if(onMem[c]/a>0.7)continue;idOf[c]=++id;}
+  const first=sg.n+1,cntN=id-sg.n;if(!cntN)return 0;
+  const A=new Int32Array(cntN),SX=new Float64Array(cntN),SY=new Float64Array(cntN),X0=new Int32Array(cntN).fill(w),Y0=new Int32Array(cntN).fill(h),X1=new Int32Array(cntN).fill(-1),Y1=new Int32Array(cntN).fill(-1);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let v=0;if(C[i])v=idOf[C[i]];else if(Z[i]&&hole[Z[i]])v=idOf[own[Z[i]]];if(!v||L[i])continue;
+    L[i]=v;const k=v-first;A[k]++;SX[k]+=x;SY[k]+=y;if(x<X0[k])X0[k]=x;if(x>X1[k])X1[k]=x;if(y<Y0[k])Y0[k]=y;if(y>Y1[k])Y1[k]=y;}
+  for(let k=0;k<cntN;k++)finishLabel(sg,first+k,X0[k],Y0[k],X1[k],Y1[k],A[k],SX[k],SY[k],{src:'red'});
+  return cntN;
+}
+function bandMap(m){const sg=S.seg,key=(sg.ver||0)+':'+sg.n+':'+m;if(S.band&&S.band.sg===sg&&S.band.key===key)return S.band.LB;
+  const {w,h}=S.work;const LB=sg.L.slice();
+  for(let it=0;it<m;it++){const p=LB.slice();let ch=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(p[i])continue;let v=0;
+    if(x>0&&p[i-1])v=p[i-1];else if(x<w-1&&p[i+1])v=p[i+1];else if(y>0&&p[i-w])v=p[i-w];else if(y<h-1&&p[i+w])v=p[i+w];if(v){LB[i]=v;ch++;}}if(!ch)break;}
+  S.band={sg,key,LB};return LB;}
+function removeLastFiber(){
+  const sg=S.seg,id=sg.n,F=sg.fib[id];if(!F||!F.drawn)return false;const {w}=S.work,[x0,y0,x1,y1]=F.bb,L=sg.L;
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=y*w+x;if(L[i]===id){L[i]=0;sg.bnd[i]=0;sg.dist[i]=0;}}
+  sg.fib.pop();sg.n--;sg.man--;sg.ver=(sg.ver||0)+1;S.ov.delete(id);if(S.sel===id)S.sel=0;return true;
+}
+function syncFibers(){
+  const sg=S.seg;if(!sg)return 0;sg.man=sg.man||0;let dropped=0;
+  for(let guard=0;guard<100000;guard++){const want=S.polys.filter(o=>o.t==='fiber');
+    if(sg.man>want.length){if(!removeLastFiber())break;continue;}
+    if(sg.man<want.length){const o=want[sg.man];if(addFiber(o))continue;S.polys.splice(S.polys.indexOf(o),1);dropped++;continue;}
+    break;}
+  return dropped;
+}
+function syncRed(){
+  if(!S.mk)return;if(!S.mk.base)S.mk.base=S.mk.m;const red=polysOf('red');
+  if(!red.length){S.mk.m=S.mk.base;return;}
+  const m=S.mk.base.slice(),{w}=S.work;
+  for(const P of red){const b=rasterBox(P);for(let y=0;y<b.bh;y++)for(let x=0;x<b.bw;x++)if(b.m[y*b.bw+x])m[(b.by+y)*w+b.bx+x]=1;}
+  S.mk.m=m;
+}
+function applyManual(){const d=syncFibers();syncRed();buildExtra();updatePolyUI();return d;}
+let exT;
+function refreshExtra(dense){
+  if(!S.seg||!S.nuc||!S.cls)return;clearTimeout(exT);
+  exT=setTimeout(()=>{if(dense){computeDense();S.keys.dn=null;}buildExtra();classify();render();showResults();},dense?250:0);
+}
+function updatePolyUI(){$('undoBtn').disabled=$('clearBtn').disabled=!S.polys.length;renderPolys();}
+function renderPolys(){
+  const g=$('polyG');g.innerHTML='';if(!S.work)return;const k=S.work.k,showInj=$('oEx').checked;
+  for(const o of S.polys){if(o.t==='fiber'||!o.p||(o.t==='inj'&&!showInj))continue;const P=o.p,el=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    el.setAttribute('points',P.map(q=>(q[0]/k).toFixed(1)+','+(q[1]/k).toFixed(1)).join(' '));
+    el.setAttribute('fill','none');el.setAttribute('stroke',o.t==='red'?'#FF3CC8':'#FF8A3D');el.setAttribute('stroke-width','1.5');el.setAttribute('stroke-dasharray','6 4');el.setAttribute('vector-effect','non-scaling-stroke');g.appendChild(el);}
+}
+function classify(){
+  if(!S.seg||!S.nuc||!S.mk)return;const p=params().cls,um=umPx(),pa=um*um,{L,n,fib,dist,maxD}=S.seg,nm=S.nuc.m,mm=S.mk.m,N=L.length;
+  const q=new Float32Array(n+1);for(let l=1;l<=n;l++)q[l]=Math.min(p.inset/um*3,0.4*maxD[l]);
+  const nucA=new Int32Array(n+1),mkA=new Int32Array(n+1),coreA=new Int32Array(n+1);
+  for(let i=0;i<N;i++){const l=L[i];if(!l)continue;if(mm[i])mkA[l]++;if(dist[i]>=q[l]){coreA[l]++;if(nm[i])nucA[l]++;}}
+  const bm=Math.round(p.band/um);let mkB=null,arB=null;
+  if(bm>0){const LB=bandMap(bm);mkB=new Int32Array(n+1);arB=new Int32Array(n+1);for(let i=0;i<N;i++){const l=LB[i];if(!l)continue;arB[l]++;if(mm[i])mkB[l]++;}}
+  const inj=new Uint8Array(n+1),rows=[];let tot=0,totA=0,cnf=0,injA=0,injMk=0,injN=0,injMkN=0,ex=0;
+  for(let l=1;l<=n;l++){const F=fib[l],o=S.ov.get(l)||{},auto=nucA[l]*pa>=p.minNuc,cen=o.central!=null?o.central:auto,
+      frac=bm>0?mkB[l]/arB[l]:mkA[l]/F.area,posAuto=frac*100>=p.frac,pos=o.red!=null?o.red:posAuto,exc=!!o.ex,isInj=!exc&&(cen||(p.incl&&pos));
+    inj[l]=isInj?1:0;
+    const area=F.area*pa,redA=o.red===true?area:o.red===false?0:(p.mode==='fiber'?(pos?area:0):mkA[l]*pa);
+    const r={id:l,area,nuc:nucA[l]*pa,core:coreA[l]*pa,frac:frac*100,pos,posAuto,redA,auto,cen,exc,inj:isInj,manual:o.central!=null,manualRed:o.red!=null,drawn:!!F.drawn,conv:!!F.conv,redDet:F.src==='red',cx:F.cx,cy:F.cy};rows.push(r);
+    if(exc){ex++;continue;}tot++;totA+=r.area;if(cen)cnf++;if(isInj){injN++;injA+=r.area;injMk+=redA;if(pos)injMkN++;}}
+  let exA=0,exMk=0;const E=S.extra;if(E)for(let i=0;i<N;i++)if(E[i]){exA++;if(mm[i])exMk++;}
+  exA*=pa;exMk*=pa;
+  const redF=new Uint8Array(n+1);for(const x of rows)if(x.pos&&!x.exc)redF[x.id]=1;
+  S.cls={q,inj,redF,rows,sum:{tot,totA,cnf,injA,injMk,injN,injMkN,ex,exA,exMk,allA:injA+exA,allMk:injMk+exMk}};
+}
+
+function showDiag(p){
+  const c={};for(const r of S.seg.rej.slice(1))if(r.why!=='bg')c[r.why]=(c[r.why]||0)+1;const n=S.seg.n||1,um=umPx(),tips=[],en=[];
+  const cnt=`未识别区域：过小 ${c.small||0}，过大 ${c.large||0}，形状不规则 ${c.shape||0}，太窄 ${c.thin||0}，凹形 ${c.concave||0}，细胞核过多 ${c.nuclei||0}，接触边缘 ${c.border||0}。`;
+  const cntEn=`Undetected: small ${c.small||0}, oversized ${c.large||0}, irregular ${c.shape||0}, narrow ${c.thin||0}, concave ${c.concave||0}, nucleus-rich ${c.nuclei||0}, edge ${c.border||0}.`;
+  const rmin=Math.sqrt(p.mem.aMin/Math.PI)/um;
+  if(p.mem.dil>=Math.max(2,rmin*0.8)||(p.mem.dil>=3&&(c.small||0)>0.3*n)){tips.push(`膜加粗为 ${p.mem.dil} 像素，可能把小纤维整个腐蚀掉。如果WGA环基本完整，建议改为1。`);en.push(`Membrane dilation of ${p.mem.dil} px may erase small fibers entirely. If WGA rings are mostly closed, use 1.`);}
+  if((c.small||0)>0.3*n){tips.push('过小的区域很多。如果其中有小纤维，请调低面积下限，并确认像素尺寸正确。');en.push('Many regions are below the minimum area. If some are small fibers, lower the minimum area and check the pixel size.');}
+  if((c.nuclei||0)>0.15*n){tips.push('很多区域因细胞核占比过高被剔除。请先单击几块灰色区域确认：如果是纤维之间的间隙，保持不变；如果是含中央核的小纤维，再调高"纤维内最大细胞核占比"。');en.push('Many regions were rejected for nuclear content. Click a few grey regions first: if they are gaps between fibers, keep the setting; if they are small fibers with central nuclei, raise the maximum nuclear area.');}
+  if((c.large||0)>0.02*n){tips.push('过大区域较多，可能是纤维粘连，可调大膜加粗。');en.push('Several oversized regions suggest merged fibers; increase dilation.');}
+  if(S.src.pxSrc!=='meta'){tips.push('图像中没有像素尺寸信息，请确认填写的像素尺寸正确，它决定所有面积和距离。');en.push('The image has no pixel-size metadata; make sure the pixel size entered is correct, as it sets all areas and distances.');}
+  const d=$('diag');d.textContent=cnt+(tips.length?' '+tips.join(' '):'');const e=document.createElement('span');e.className='en';e.textContent=cntEn+(en.length?' '+en.join(' '):'');d.appendChild(e);
+}
+async function run(){
+  if(!S.src||S.busy)return;S.busy=true;$('run').disabled=true;
+  try{
+    const p=params();if(!(p.px>0))throw bi('请填写正确的像素尺寸。','Enter a valid pixel size.');
+    prepareWork();const um=umPx();
+    const kSeg=JSON.stringify([S.keys.work,p.px,p.mem]),kNuc=JSON.stringify([S.keys.work,p.px,p.nuc]),kMk=JSON.stringify([S.keys.work,p.px,p.mk]);
+    if(S.keys.nuc!==kNuc){S.nuc=await mask(S.work.nuc,p.nuc,um,['识别细胞核…','Detecting nuclei…'],8);S.keys.nuc=kNuc;}
+    if(S.keys.mk!==kMk){S.mk=await mask(S.work.mk,p.mk,um,['识别红色阳性像素…','Detecting red+ pixels…'],12);S.keys.mk=kMk;}
+    const kSeg2=kSeg+kNuc+((p.rs.on||p.mem.redKeep)?kMk:'')+(p.rs.on?JSON.stringify(p.rs):'');
+    if(S.keys.seg!==kSeg2){S.seg=await segment(p.mem,um,S.nuc.m,S.mk.base||S.mk.m);
+      if(p.rs.on){status('用红色信号补充识别小纤维…','Detecting small red+ fibers…',70);await tick();const sm=redSeedMask(p.rs,um);S.seg.redThr=sm.thr;S.seg.redN=addRedFibers(S.seg,sm.m,p.rs,um);}
+      S.keys.seg=kSeg2;S.sel=0;S.rejSel=0;S.ov.clear();S.rejOv.clear();}
+    const kDn=JSON.stringify([kSeg,kNuc,p.dn]);if(S.keys.dn!==kDn){status('识别无纤维的DAPI密集区…','Detecting fiber-free DAPI-dense areas…',90);await tick();computeDense();S.keys.dn=kDn;}
+    applyManual();
+    if(p.mem.auto)$('memThr').value=S.seg.thr;if(p.nuc.auto)$('nucThr').value=S.nuc.thr;if(p.mk.auto)$('mkThr').value=S.mk.thr;if(p.rs.on&&p.rs.auto&&S.seg.redThr!=null)$('rsThr').value=S.seg.redThr;
+    status('判定与汇总…','Classifying and summarizing…',95);await tick();classify();render();showResults();
+    showDiag(p);
+    if(S.seg.n)status(`完成：识别 ${S.seg.n} 根纤维。`,`Done: ${S.seg.n} fibers detected.`,100);else status('没有识别到纤维。请检查WGA通道选择、阈值和面积范围。','No fibers detected. Check the WGA channel, threshold and area range.',100,true);
+    $('expCsv').disabled=$('expPng').disabled=!S.seg.n;
+  }catch(e){console.error(e);if(e&&e.en)status(e.message,e.en,0,true);else status('分析失败，可能是图像过大导致内存不足。请增大缩小倍数后重试。','Analysis failed, probably because the image is too large for browser memory. Increase the downscale factor and try again.',0,true);}
+  S.busy=false;$('run').disabled=false;
+}
+
+/* ---------- Rendering ---------- */
+const cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage');
+function blend(d,j,r,g,b,a){d[j]=d[j]*(1-a)+r*a;d[j+1]=d[j+1]*(1-a)+g*a;d[j+2]=d[j+2]*(1-a)+b*a;}
+function render(){
+  const W=S.work;if(!W){$('empty').style.display='';return;}$('empty').style.display='none';
+  const {w,h}=W;if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}$('svg').setAttribute('viewBox',`0 0 ${w} ${h}`);renderPolys();
+  const EX=$('oEx').checked&&S.extra;
+  const img=ctx.createImageData(w,h),d=img.data,gn=+$('gain').value,vm=$('vMem').checked,vn=$('vNuc').checked,vk=$('vMk').checked;
+  const seg=S.seg,cls=S.cls,orj=$('oRej').checked,rs=S.rejSel||0,ord=$('oRed').checked,ol=$('oLine').checked,ofl=$('oFill').checked,omk=$('oMk').checked,onu=$('oNuc').checked,sel=S.sel;
+  const L=seg&&seg.L,bnd=seg&&seg.bnd,dist=seg&&seg.dist,inj=cls&&cls.inj,q=cls&&cls.q,mk=S.mk&&S.mk.m,nu=S.nuc&&S.nuc.m;
+  const exS=new Set();if(cls)cls.rows.forEach(r=>{if(r.exc)exS.add(r.id);});
+  for(let i=0,j=0;i<w*h;i++,j+=4){
+    let r=vk?W.mk[i]*gn:0,g=vm?W.mem[i]*gn:0,b=vn?W.nuc[i]*gn:0;
+    d[j]=r>255?255:r;d[j+1]=g>255?255:g;d[j+2]=b>255?255:b;d[j+3]=255;
+    if(!L)continue;const l=L[i];
+    if(onu&&nu&&nu[i])blend(d,j,120,160,255,.55);
+    if(seg){const rr=seg.R[i];if(rr&&!seg.L[i]&&!(EX&&EX[i])){if(rr===rs)blend(d,j,54,215,255,.45);else if(orj&&seg.rej[rr].show)blend(d,j,150,150,170,.45);}}
+    if(EX&&EX[i]){const x=i%w;if(x===0||x===w-1||i<w||i>=w*(h-1)||!EX[i-1]||!EX[i+1]||!EX[i-w]||!EX[i+w]){d[j]=255;d[j+1]=138;d[j+2]=61;}else blend(d,j,255,128,40,.5);}
+    if(!l)continue;
+    if(ofl&&inj&&inj[l])blend(d,j,255,210,63,.2);
+    if(omk&&mk&&mk[i])blend(d,j,255,40,200,.55);
+    if(l===sel&&q&&dist[i]>=q[l])blend(d,j,54,215,255,.35);
+    if(ord&&cls&&cls.redF[l]&&dist[i]>=3&&dist[i]<=7){d[j]=255;d[j+1]=60;d[j+2]=200;}
+    if(ol&&bnd[i]){
+      if(l===sel){d[j]=54;d[j+1]=215;d[j+2]=255;}
+      else if(exS.has(l)){d[j]=d[j+1]=d[j+2]=119;}
+      else if(inj&&inj[l]){d[j]=255;d[j+1]=210;d[j+2]=63;}
+      else blend(d,j,232,232,232,.6);
+    }
+  }
+  ctx.putImageData(img,0,0);
+  const idm=$('oId').value;
+  if(idm!=='none'&&cls&&seg){
+    ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+    for(const r of cls.rows){
+      if(idm==='inj'&&!r.inj)continue;
+      const fs=Math.max(7,Math.min(40,Math.sqrt(seg.fib[r.id].area)*0.32));
+      ctx.font=`600 ${fs.toFixed(1)}px "IBM Plex Sans",system-ui,sans-serif`;
+      ctx.lineWidth=Math.max(2,fs/4);ctx.strokeStyle='rgba(0,0,0,.85)';
+      ctx.fillStyle=r.id===sel?'#36D7FF':r.exc?'#9a9a9a':r.inj?'#FFD23F':'#FFFFFF';
+      ctx.strokeText(r.id,r.cx,r.cy);ctx.fillText(r.id,r.cx,r.cy);
+    }
+    ctx.restore();
+  }
+}
+function applyZoom(z,cx,cy){
+  if(!S.work)return;const {w,h}=S.work;z=Math.max(0.02,Math.min(16,z));
+  const old=S.zoom||z,rect=stage.getBoundingClientRect();
+  if(cx==null){cx=rect.width/2;cy=rect.height/2;}
+  const ix=(stage.scrollLeft+cx)/old,iy=(stage.scrollTop+cy)/old;
+  S.zoom=z;cv.style.width=w*z+'px';cv.style.height=h*z+'px';cv.style.imageRendering=z>=2?'pixelated':'auto';
+  stage.scrollLeft=ix*z-cx;stage.scrollTop=iy*z-cy;
+}
+function fit(){if(!S.work)return;const {w,h}=S.work;S.zoom=0;const z=Math.min(stage.clientWidth/w,stage.clientHeight/h);S.zoom=z;applyZoom(z);stage.scrollLeft=stage.scrollTop=0;}
+function centerOn(x,y){if(S.zoom<1)applyZoom(1.5);stage.scrollLeft=x*S.zoom-stage.clientWidth/2;stage.scrollTop=y*S.zoom-stage.clientHeight/2;}
+
+/* ---------- Results ---------- */
+function showResults(){
+  const c=S.cls;$('drawFib').disabled=$('drawRed').disabled=!c;if(!c&&(S.drawMode==='fiber'||S.drawMode==='red'))setDraw(null);
+  if(!c){['rRatio','rFib','rCnf','rInj','rMk','rMkF','rInjPct','rInjMean','rInjMed','rNonMean','rRedMean'].forEach(id=>$(id).textContent='–');$('tbody').innerHTML='<tr><td colspan="5" style="text-align:left;color:var(--muted)">暂无数据 No data yet</td></tr>';$('tNote').textContent='';showFiber();return;}
+  const s=c.sum;
+  $('rRatio').textContent=s.allA?fmt(s.allMk/s.allA*100,1)+'%':'–';
+  $('rFib').textContent=s.tot+(s.ex?`（另排除 ${s.ex} / ${s.ex} excluded）`:'');
+  $('rCnf').textContent=`${s.cnf}（${fmt(s.tot?s.cnf/s.tot*100:NaN,1)}%）`;
+  $('rInj').textContent=fmtArea(s.allA)+(s.exA?`（含无纤维区 incl. fiber-free ${fmtArea(s.exA)}）`:'');
+  $('rMk').textContent=fmtArea(s.allMk)+(s.exA?`（无纤维区 fiber-free ${fmtArea(s.exMk)}）`:'');
+  $('rMkF').textContent=`${s.injMkN} / ${s.injN}（${fmt(s.injN?s.injMkN/s.injN*100:NaN,1)}%）`;
+  $('rInjPct').textContent=fmt(s.totA?s.injA/s.totA*100:NaN,1)+'%';
+  const A=areaStats(c);$('rInjMean').textContent=A.inj.n?`${fmt(A.inj.mean,0)} ± ${fmt(A.inj.sd,0)} µm²（n=${A.inj.n}）`:'–';
+  $('rInjMed').textContent=A.inj.n?`${fmt(A.inj.med,0)} µm²`:'–';
+  $('rNonMean').textContent=A.non.n?`${fmt(A.non.mean,0)} ± ${fmt(A.non.sd,0)} µm²（n=${A.non.n}）`:'–';
+  $('rRedMean').textContent=A.red.n?`${fmt(A.red.mean,0)} ± ${fmt(A.red.sd,0)} µm²（n=${A.red.n}）`:'–';
+  renderTable();showFiber();
+}
+function areaStats(c){const st=a=>{const n=a.length;if(!n)return {n:0};a.sort((x,y)=>x-y);const mean=a.reduce((p,v)=>p+v,0)/n,sd=n>1?Math.sqrt(a.reduce((p,v)=>p+(v-mean)**2,0)/(n-1)):0,med=n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2;return {n,mean,sd,med};};
+  const ok=c.rows.filter(r=>!r.exc);return {inj:st(ok.filter(r=>r.inj).map(r=>r.area)),non:st(ok.filter(r=>!r.inj).map(r=>r.area)),red:st(ok.filter(r=>r.inj&&r.pos).map(r=>r.area)),all:st(ok.map(r=>r.area))};}
+function verdict(r){if(r.exc)return '<span class="tag ex">已排除 Excluded</span>';const p=[r.inj?'<span class="tag inj">损伤区 Injured</span>':'非损伤区 Non-injured'];
+  if(r.cen)p.push('中央核 CNF'+(r.manual?'（手动 manual）':''));if(r.pos)p.push('红色阳性 Red+'+(r.manualRed?'（手动 manual）':''));else if(r.manualRed)p.push('红色阴性 Red−（手动 manual）');
+  if(!r.cen&&r.manual)p.push('非中央核 Not CNF（手动 manual）');if(r.conv)p.push('由未识别区域转换 Converted');else if(r.drawn)p.push('手动圈画 Drawn');if(r.redDet)p.push('红色补充识别 Red-detected');return p.join('，');}
+function renderTable(){
+  const c=S.cls;if(!c)return;const f=$('tFilter').value;
+  const rows=c.rows.filter(r=>f==='all'?true:f==='inj'?r.inj:f==='non'?(!r.inj&&!r.exc):r.exc);
+  const lim=500,html=rows.slice(0,lim).map(r=>`<tr data-id="${r.id}"${r.id===S.sel?' class="sel"':''}><td>${r.id}</td><td>${fmt(r.area,0)}</td><td>${fmt(r.nuc,1)}</td><td>${fmt(r.frac,1)}</td><td>${verdict(r)}</td></tr>`).join('');
+  $('tbody').innerHTML=html||'<tr><td colspan="5" style="text-align:left;color:var(--muted)">没有符合条件的纤维 No matching fibers</td></tr>';
+  $('tNote').textContent=rows.length>lim?`共 ${rows.length} 行，这里只显示前 ${lim} 行；导出CSV可获得全部数据。 ${rows.length} rows; showing the first ${lim}. Export CSV for all data.`:`共 ${rows.length} 行。 ${rows.length} rows.`;
+}
+function showFiber(){
+  const box=$('fiberBox'),c=S.cls;
+  if(c&&!S.sel&&S.rejSel){const P=params().mem,R0=S.rejSel>0?S.seg.rej[S.rejSel]:null;let zh,en,tip='',tipEn='';
+    if(!R0){zh='这里是膜或纤维之间的间隙，没有点到纤维内部。';en='This point is on a membrane or in the gap between fibers, not inside a fiber.';tip='放大后点在纤维中央再试。';tipEn='Zoom in and click the center of a fiber.';}
+    else if(R0.why==='small'){zh=`这个区域面积 ${fmt(R0.area,0)} µm²，小于面积下限 ${P.aMin} µm²，所以没有算作纤维。`;en=`Area ${fmt(R0.area,0)} µm² is below the minimum of ${P.aMin} µm², so it was not counted as a fiber.`;tip='如果它确实是一根小的再生纤维，请调低"纤维面积范围"的下限，并确认像素尺寸填写正确。';tipEn='If it is a small regenerating fiber, lower the minimum fiber area and check that the pixel size is correct.';}
+    else if(R0.why==='large'){zh=`这个区域面积 ${fmt(R0.area,0)} µm²，大于面积上限 ${P.aMax} µm²，通常是几根纤维之间的膜有缺口，被连成了一块。`;en=`Area ${fmt(R0.area,0)} µm² exceeds the maximum of ${P.aMax} µm². Usually several fibers have merged through gaps in the membrane.`;tip='可以调大"膜加粗"（约4 µm对应的像素数），或手动调低WGA阈值，让断开的膜连起来。如果这块其实是损伤间质，也可以直接计入损伤区。';tipEn='Increase membrane dilation (about 4 µm in pixels) or lower the WGA threshold so broken membranes close. If this is injured interstitium, you can add it to the injured area instead.';}
+    else if(R0.why==='border'){zh='这个区域接触图像边缘，按设置被排除。';en='This region touches the image edge and was excluded by the border setting.';tip='如需纳入，可取消勾选"排除接触图像边缘的纤维"。';tipEn='Untick "Exclude fibers touching the image edge" to include it.';}
+    else if(R0.why==='concave'){zh=`这个区域的凸度只有 ${fmt(R0.so,2)}（下限 ${P.solMin}），边缘向内凹，典型地是被几根圆形纤维夹住的缝隙。`;en=`Solidity is only ${fmt(R0.so,2)} (minimum ${P.solMin}); its edges curve inward, typical of a gap squeezed between round fibers.`;tip='如果它其实是一根形状不规则的纤维，可调低"最小凸度"，或单独转为纤维。';tipEn='If it is an irregular fiber, lower the minimum solidity or convert it individually.';}
+    else if(R0.why==='thin'){zh=`这个区域太窄（最大内切半径 ${fmt(R0.ri,1)} µm，下限 ${P.riMin} µm），多为相邻纤维之间的缝隙。`;en=`This region is too narrow (largest inscribed radius ${fmt(R0.ri,1)} µm, minimum ${P.riMin} µm); it is most likely a gap between neighboring fibers.`;tip='如果它其实是一根很小的纤维，可调低"最小内切半径"，或单独转为纤维。';tipEn='If it is actually a very small fiber, lower the minimum inscribed radius or convert it individually.';}
+    else if(R0.why==='shape'){zh=`这个区域形状不规则（形状指数 ${fmt(R0.shape,1)}，上限 ${P.shapeMax}），更像分支状的间质，或是几根纤维经间质连在了一起。`;en=`This region is irregular (shape index ${fmt(R0.shape,1)}, limit ${P.shapeMax}); it looks like branching interstitium or several fibers joined through it.`;tip='如果它其实是纤维，可调高"最大形状指数"；如果是几根纤维连在一起，可调大"膜加粗"。';tipEn='If it is a fiber, raise the max. shape index; if several fibers are joined, increase membrane dilation.';}
+    else if(R0.why==='nuclei'){zh=`这个区域中细胞核占 ${fmt(R0.nf,0)}%，超过上限 ${P.nucMax}%，被视为细胞浸润的间质。`;en=`Nuclei cover ${fmt(R0.nf,0)}% of this region, above the ${P.nucMax}% limit, so it was treated as infiltrated interstitium.`;tip='如果它是含多个中央核的小纤维，可调高"纤维内最大细胞核占比"。';tipEn='If it is a small fiber with several central nuclei, raise the max. nuclear area.';}
+    else{zh='这个区域通过膜上的缺口与切片外的背景连在一起，被当成了背景。常见于切片边缘膜不完整的纤维。';en='This region connects to the background outside the section through a gap in the membrane, so it was treated as background. This is common for fibers at the section edge with incomplete membranes.';tip='调大"膜加粗"（约4 µm对应的像素数）通常可以封住缺口。';tipEn='Increasing membrane dilation (about 4 µm in pixels) usually closes the gap.';}
+    let btn='';if(R0&&R0.why!=='bg'){const on=rejIncluded(S.rejSel),st=S.rejOv.has(S.rejSel)?(S.rejOv.get(S.rejSel)?'inj':'non'):'cat',sel=k=>st===k?' sel':'';
+      btn=`<div class="segbtn" role="group" aria-label="损伤区判定" style="margin-top:10px"><button class="btn${sel('inj')}" type="button" data-act="rejInj">损伤区<span class="en">Injured</span></button><button class="btn${sel('non')}" type="button" data-act="rejNon">非损伤区<span class="en">Non-injured</span></button><button class="btn${sel('cat')}" type="button" data-act="rejCat">按类别<span class="en">By category</span></button></div>
+      <p class="hint" style="margin:6px 0 0">当前${on?'计入':'不计入'}损伤区${st==='cat'?'（按类别设置）':'（单独设置）'}。快捷键：I 损伤区，N 非损伤区，F 转为纤维。<span class="en">Currently ${on?'counted':'not counted'} as injured (${st==='cat'?'category setting':'set individually'}). Shortcuts: I injured, N non-injured, F convert to fiber.</span></p>
+      <div class="acts" style="margin-top:8px"><button class="btn" type="button" data-act="rejFib">转为纤维<span class="en">Convert to fiber</span></button></div>
+      <p class="hint" style="margin:4px 0 0">如果它其实是一根纤维，转为纤维后可像其他纤维一样判定中央核和红色阳性。<span class="en">If it is actually a fiber, convert it; it is then classified and corrected like any other fiber.</span></p>`;}
+    box.innerHTML=`<h2>未识别为纤维<span class="en i">Not detected as a fiber</span></h2><p style="margin:6px 0">${zh}<span class="en">${en}</span></p><p class="hint" style="margin:0">${tip}<span class="en">${tipEn}</span></p>${btn}`;return;}
+  if(!c||!S.sel){box.innerHTML='<h2>选中的纤维<span class="en i">Selected fiber</span></h2><p class="hint" style="margin:0">'+(c?'单击图中任意纤维，或单击下方表格中的一行，可查看它的数据并手动修正判定。<span class="en">Click a fiber in the image or a row in the table to see its data and correct the call.</span>':'运行分析后，单击图中任意纤维，可查看它的数据并手动修正判定。<span class="en">After running the analysis, click any fiber to see its data and correct the call.</span>')+'</p>';return;}
+  const r=c.rows[S.sel-1];
+  const D=(zh,en)=>`<dt>${zh}<span class="en">${en}</span></dt>`;
+  box.innerHTML=`<h2>纤维 ${r.id}<span class="en i">Fiber ${r.id}</span></h2><dl>
+    ${D('面积','Area')}<dd>${fmt(r.area,0)} µm²</dd>
+    ${D('中心区面积','Core area')}<dd>${fmt(r.core,0)} µm²</dd>
+    ${D('中心区核面积','Core nuclear area')}<dd>${fmt(r.nuc,1)} µm²</dd>
+    ${D('红色占比','Red fraction')}<dd>${fmt(r.frac,1)}%</dd>
+    ${D('计入红色阳性面积','Red+ area counted')}<dd>${fmt(r.redA,0)} µm²</dd>
+    ${D('自动判定','Automatic call')}<dd>${r.auto?'中央核 CNF':'非中央核 Not CNF'}，${r.posAuto?'红色阳性 Red+':'红色阴性 Red−'}</dd>
+    ${D('当前判定','Current call')}<dd>${verdict(r)}</dd></dl>
+    <div class="acts">
+      <button class="btn" type="button" data-act="cen">${r.cen?'改为非中央核<span class="en">Mark not central</span>':'改为中央核<span class="en">Mark central</span>'}</button>
+      <button class="btn" type="button" data-act="red">${r.pos?'改为红色阴性<span class="en">Mark red−</span>':'改为红色阳性<span class="en">Mark red+</span>'}</button>
+      <button class="btn" type="button" data-act="ex">${r.exc?'恢复这根纤维<span class="en">Restore fiber</span>':'排除这根纤维<span class="en">Exclude fiber</span>'}</button>
+      ${(r.manual||r.manualRed||r.exc)?'<button class="btn" type="button" data-act="reset">恢复自动判定<span class="en">Reset to automatic</span></button>':''}
+    </div><p class="hint" style="margin:10px 0 0">快捷键：C 切换中央核，R 切换红色阳性，X 排除或恢复。<span class="en">Shortcuts: C toggles central nuclei, R toggles red+, X excludes or restores.</span></p>`;
+}
+function select(id,center){S.sel=id;S.rejSel=0;render();renderTable();showFiber();if(center&&id){const r=S.cls.rows[id-1];centerOn(r.cx,r.cy);}}
+function refreshCls(){if(!S.cls)return;classify();render();showResults();}
+
+/* ---------- Export ---------- */
+function csv(){
+  const c=S.cls,p=params(),um=umPx(),s=c.sum,q=v=>`"${String(v).replace(/"/g,'""')}"`;
+  const L=[];L.push('# 汇总 Summary');
+  L.push(['红色阳性面积占损伤区面积 Red+ area / injured area (%)',fmt(s.allA?s.allMk/s.allA*100:NaN,2)].join(','));
+  L.push(['纤维数(不含排除) Fibers (excl. excluded)',s.tot].join(','),['中央核纤维数 Centrally nucleated fibers',s.cnf].join(','),['损伤区面积 Injured area (µm²)',s.allA.toFixed(1)].join(','),['其中损伤纤维面积 of which injured fibers (µm²)',s.injA.toFixed(1)].join(','),['其中无纤维损伤区面积 of which fiber-free (µm²)',s.exA.toFixed(1)].join(','),
+    ['损伤区内红色阳性面积 Red+ area in injured region (µm²)',s.allMk.toFixed(1)].join(','),['其中无纤维损伤区内红色面积 of which in fiber-free area (µm²)',s.exMk.toFixed(1)].join(','),['手动框选损伤区数 Drawn injured areas',polysOf('inj').length].join(','),['手动圈画纤维数 Drawn fibers',S.polys.filter(o=>o.t==='fiber'&&!o.rej).length].join(','),['由未识别区域转换的纤维数 Fibers converted from undetected regions',S.polys.filter(o=>o.t==='fiber'&&o.rej).length].join(','),['手动圈画红色区域数 Drawn red+ areas',polysOf('red').length].join(','),['损伤区纤维数 Injured fibers',s.injN].join(','),['损伤区内红色阳性纤维数 Red+ fibers in injured region',s.injMkN].join(','),
+    ['全部纤维面积 Total fiber area (µm²)',s.totA.toFixed(1)].join(','),['手动排除纤维数 Manually excluded fibers',s.ex].join(','));
+  {const A=areaStats(c),row=(zh,o)=>[zh,o.n||0,o.n?o.mean.toFixed(1):'',o.n?o.sd.toFixed(1):'',o.n?o.med.toFixed(1):''].join(',');
+   L.push('# 纤维面积统计 Fiber area statistics (µm²),n,均值 mean,标准差 SD,中位数 median');
+   L.push(row('损伤纤维 Injured fibers',A.inj),row('非损伤纤维 Non-injured fibers',A.non),row('红色阳性损伤纤维 Red+ injured fibers',A.red),row('全部纤维 All fibers',A.all));}
+  L.push('# 参数 Parameters');
+  L.push(['工具版本 Tool version',VERSION].join(','),['分析时间 Analyzed at',new Date().toISOString()].join(','),['图像 Image',q(S.name||'')].join(','));
+  L.push([q('处理分辨率 Working resolution (µm/px)'),um.toFixed(4)].join(','),[q('原图像素尺寸 Original pixel size (µm/px)'),(p.px*S.src.pre).toFixed(4)].join(','),[q('缩放方式 Rescaling'),p.scale==='target'?'统一分辨率 common '+num('targetUm'):p.scale].join(','),[q('WGA阈值 WGA threshold'),S.seg.thr].join(','),[q('细胞核阈值 Nuclear threshold'),S.nuc.thr].join(','),[q('红色阈值 Red threshold'),S.mk.thr].join(','),
+    [q('膜加粗 Membrane dilation (px)'),p.mem.dil].join(','),[q('第二遍膜加粗 Second-pass dilation (px)'),p.mem.dil2>=0?p.mem.dil2:'否 no'].join(','),[q('红色阳性区域不按细胞核剔除 Red+ regions exempt from nuclear filter'),p.mem.redKeep?'是 yes':'否 no'].join(','),[q('像素尺寸来源 Pixel size source'),S.src.pxSrc==='meta'?'Keyence metadata':'manual'].join(','),[q('最小凸度 Min. solidity'),p.mem.solMin].join(','),[q('最小内切半径 Min. inscribed radius (µm)'),p.mem.riMin].join(','),[q('最大形状指数 Max. shape index'),p.mem.shapeMax].join(','),[q('纤维内最大细胞核占比 Max. nuclear area in fiber (%)'),p.mem.nucMax].join(','),[q('面积范围 Area range (µm²)'),q(p.mem.aMin+'-'+p.mem.aMax)].join(','),[q('中心区内缩 Core inset (µm)'),p.cls.inset].join(','),
+    [q('中心区最小核面积 Min. core nuclear area (µm²)'),p.cls.minNuc].join(','),[q('阳性纤维面积占比 Red+ fiber area fraction (%)'),p.cls.frac].join(','),[q('阳性判定外扩距离 Margin for red+ call (µm)'),p.cls.band].join(','),[q('红色补充识别小纤维 Red-detected small fibers'),p.rs.on?`${p.rs.minA}-${p.rs.maxA} µm², thr ${S.seg.redThr} (n=${S.seg.redN||0})`:'否 no'].join(','),[q('红色面积计算方式 Red+ area method'),p.cls.mode==='fiber'?'阳性纤维整根 whole red+ fibers':'按像素 pixels'].join(','),[q('红色手动修正纤维数 Fibers with manual red call'),c.rows.filter(x=>x.manualRed).length].join(','),[q('红色阳性纤维计入损伤区 Red+ fibers counted as injured'),p.cls.incl?'是 yes':'否 no'].join(','),[q('自动识别DAPI密集区 Auto DAPI-dense'),p.dn.auto?'是 yes':'否 no'].join(','),[q('密度半径 Density radius (µm)'),p.dn.r].join(','),[q('核覆盖率阈值 Nuclear coverage (%)'),p.dn.pct].join(','),[q('最小区域面积 Min. region area (µm²)'),p.dn.min].join(','),[q('计入的未识别区域类别 Undetected region categories counted as injured'),q(['inter','large','small','border'].filter(k=>p.dn.inc[k]).join(' ')||'none')].join(','),[q('单独设置的未识别区域数 Individually toggled undetected regions'),S.rejOv.size].join(','));
+  L.push('# 每根纤维 Per fiber');
+  L.push('编号 ID,面积 Area (µm²),中心区面积 Core area (µm²),中心区核面积 Core nuclear area (µm²),红色占比 Red fraction (%),计入红色阳性面积 Red+ area counted (µm²),自动判定中央核 Auto central,最终判定中央核 Final central,自动红色阳性 Auto red+,最终红色阳性 Final red+,损伤区 Injured,中央核手动修正 Central manual,红色手动修正 Red manual,手动圈画纤维 Drawn fiber,红色补充识别 Red-detected,已排除 Excluded,质心x Centroid x (px),质心y Centroid y (px)');
+  for(const r of c.rows)L.push([r.id,r.area.toFixed(1),r.core.toFixed(1),r.nuc.toFixed(2),r.frac.toFixed(2),r.redA.toFixed(1),r.auto?1:0,r.cen?1:0,r.posAuto?1:0,r.pos?1:0,r.inj?1:0,r.manual?1:0,r.manualRed?1:0,r.drawn?1:0,r.redDet?1:0,r.exc?1:0,r.cx.toFixed(1),r.cy.toFixed(1)].join(','));
+  return '\ufeff'+L.join('\r\n');
+}
+async function save(name,data,mime){
+  if(dl){try{await dl.save({filename:name,data});toast('已保存 Saved: '+name);}catch(e){if(e&&e.code==='declined')return;if(e&&e.code==='rate_limited'){toast('已有一个保存提示，请先处理它。 A save prompt is already open.');return;}toast('无法保存 Could not save: '+(e&&e.message||'未知错误 unknown error'));}return;}
+  try{const blob=data instanceof Blob?data:new Blob([data],{type:mime});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);}
+  catch(e){if(typeof data==='string'&&navigator.clipboard){await navigator.clipboard.writeText(data);toast('无法下载，已把CSV复制到剪贴板。 Download unavailable; CSV copied to clipboard.');}else toast('当前环境无法保存文件。 Files cannot be saved here.');}
+}
+function stamp(){const d=new Date(),z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;}
+
+/* ---------- Events ---------- */
+$('file').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadFile(f);});
+$('demo').addEventListener('click',()=>{status('正在生成示例图…','Generating sample image…',5);setTimeout(()=>{makeDemo();},20);});
+$('run').addEventListener('click',run);
+$('scale').addEventListener('change',()=>{$('targetUm').disabled=$('scale').value!=='target';});
+$('targetUm').addEventListener('input',updateWorkInfo);
+['chMem','chNuc','chMk','scale'].forEach(id=>$(id).addEventListener('change',()=>{if(!S.src)return;updateWorkInfo();const changed=prepareWork();if(changed){render();fit();showResults();$('expCsv').disabled=$('expPng').disabled=true;status('通道或尺寸已更改，请重新运行分析。','Channels or size changed. Run the analysis again.',0);}}));
+$('pxUm').addEventListener('input',()=>{if(S.src)S.src.pxSrc='manual';updateWorkInfo();});
+[['memAuto','memThr'],['nucAuto','nucThr'],['mkAuto','mkThr'],['rsAuto','rsThr']].forEach(([a,t])=>$(a).addEventListener('change',()=>{$(t).disabled=$(a).checked;}));
+['inset','minNuc','mkFrac','inclMk','mkMode','mkBand'].forEach(id=>$(id).addEventListener(id==='inclMk'||id==='mkMode'?'change':'input',refreshCls));
+['vMem','vNuc','vMk','oLine','oFill','oMk','oNuc','oId','oRed','oRej'].forEach(id=>$(id).addEventListener('change',render));
+let gT;$('gain').addEventListener('input',()=>{cancelAnimationFrame(gT);gT=requestAnimationFrame(render);});
+$('zIn').addEventListener('click',()=>applyZoom(S.zoom*1.5));$('zOut').addEventListener('click',()=>applyZoom(S.zoom/1.5));
+$('zFit').addEventListener('click',fit);$('z1').addEventListener('click',()=>applyZoom(1));
+stage.addEventListener('wheel',e=>{if(!(e.ctrlKey||e.metaKey)||!S.work)return;e.preventDefault();const r=stage.getBoundingClientRect();applyZoom(S.zoom*(e.deltaY<0?1.2:1/1.2),e.clientX-r.left,e.clientY-r.top);},{passive:false});
+let drag=null;
+const imgXY=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*S.work.w,(e.clientY-r.top)/r.height*S.work.h];};
+const DRAW={inj:{btn:'drawBtn',c:'#FF8A3D',f:'rgba(255,138,61,.18)',zh:'圈画无纤维的损伤区域',en:'Outline a fiber-free injured area'},
+  fiber:{btn:'drawFib',c:'#36D7FF',f:'rgba(54,215,255,.18)',zh:'沿纤维内缘圈画一根漏掉的纤维',en:'Trace the inner edge of a missed fiber'},
+  red:{btn:'drawRed',c:'#FF3CC8',f:'rgba(255,60,200,.2)',zh:'圈画漏掉的红色阳性区域',en:'Outline a missed red+ area'}};
+function setDraw(mode){S.drawMode=mode||null;for(const k in DRAW)$(DRAW[k].btn).classList.toggle('on',S.drawMode===k);stage.classList.toggle('drawing',!!S.drawMode);S.cur=null;
+  const ln=$('drawLine');ln.setAttribute('points','');
+  if(S.drawMode){const D=DRAW[S.drawMode];ln.setAttribute('stroke',D.c);ln.setAttribute('fill',D.f);toast(`${D.zh}：按住鼠标拖动，松开完成；按Esc退出。 ${D.en}: drag, release to finish, Esc to exit.`);}}
+stage.addEventListener('pointerdown',e=>{if(S.drawMode&&S.work&&e.button===0){S.cur=[imgXY(e)];stage.setPointerCapture(e.pointerId);e.preventDefault();return;}});
+stage.addEventListener('pointermove',e=>{if(!S.cur)return;const p=imgXY(e),l=S.cur[S.cur.length-1];if(Math.hypot(p[0]-l[0],p[1]-l[1])*S.zoom<3)return;S.cur.push(p);
+  $('drawLine').setAttribute('points',S.cur.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' '));});
+stage.addEventListener('pointerup',()=>{if(!S.cur)return;const P=S.cur;S.cur=null;$('drawLine').setAttribute('points','');
+  let a=0;for(let i=0;i<P.length;i++){const p=P[i],q=P[(i+1)%P.length];a+=p[0]*q[1]-q[0]*p[1];}
+  if(P.length<3||Math.abs(a)/2<30){toast('区域太小，未添加。 Region too small; not added.');return;}
+  const k=S.work.k,t=S.drawMode;S.polys.push({t,p:P.map(q=>[q[0]*k,q[1]*k])});
+  if(!S.cls){updatePolyUI();toast('区域已添加，运行分析后计入。 Region added; it will count after you run the analysis.');return;}
+  const dropped=applyManual();classify();render();showResults();
+  if(t==='fiber'){if(dropped)toast('圈内的像素已全部属于其他纤维，未添加。 All pixels inside already belong to other fibers; not added.');else{select(S.seg.n,false);toast(`已添加纤维 ${S.seg.n}，可继续校正其判定。 Fiber ${S.seg.n} added; you can correct its calls.`);}}
+  else if(t==='red')toast('已计入红色阳性。 Added to red+.');else toast('已加入损伤区。 Added to injured area.');});
+stage.addEventListener('pointerdown',e=>{if(S.drawMode||!S.work||e.button!==0)return;drag={x:e.clientX,y:e.clientY,sl:stage.scrollLeft,st:stage.scrollTop,moved:false,id:e.pointerId};stage.setPointerCapture(e.pointerId);});
+stage.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!drag.moved&&Math.hypot(dx,dy)>4)drag.moved=true;if(drag.moved){stage.scrollLeft=drag.sl-dx;stage.scrollTop=drag.st-dy;}});
+stage.addEventListener('pointerup',e=>{if(S.drawMode||!drag)return;const d=drag;drag=null;if(d.moved||!S.seg||!S.cls)return;
+  const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*S.work.w),y=Math.floor((e.clientY-r.top)/r.height*S.work.h);
+  if(x<0||y<0||x>=S.work.w||y>=S.work.h)return;const pi=y*S.work.w+x,lid=S.seg.L[pi];if(lid)select(lid,false);else{S.sel=0;S.rejSel=S.seg.R[pi]||-1;render();renderTable();showFiber();}});
+stage.addEventListener('pointercancel',()=>{drag=null;S.cur=null;$('drawLine').setAttribute('points','');});
+for(const k in DRAW)$(DRAW[k].btn).addEventListener('click',()=>setDraw(S.drawMode===k?null:k));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.drawMode){setDraw(null);}});
+$('undoBtn').addEventListener('click',()=>{S.polys.pop();if(S.cls){applyManual();classify();render();showResults();}else updatePolyUI();});
+$('clearBtn').addEventListener('click',()=>{S.polys=[];if(S.cls){applyManual();classify();render();showResults();}else updatePolyUI();});
+$('oEx').addEventListener('change',()=>{render();});
+$('dnAuto').addEventListener('change',()=>refreshExtra(true));
+['incInter','incLarge','incSmall','incBorder'].forEach(id=>$(id).addEventListener('change',()=>refreshExtra(false)));
+['dnR','dnPct','dnMin'].forEach(id=>$(id).addEventListener('input',()=>{if($('dnAuto').checked)refreshExtra(true);}));
+$('tbody').addEventListener('click',e=>{const tr=e.target.closest('tr[data-id]');if(tr)select(+tr.dataset.id,true);});
+$('tFilter').addEventListener('change',renderTable);
+$('fiberBox').addEventListener('click',e=>{const b=e.target.closest('button[data-act]');if(!b)return;
+  if(b.dataset.act.startsWith('rej')){rejAct(b.dataset.act);return;}
+  if(!S.sel)return;const r=S.cls.rows[S.sel-1],o=Object.assign({},S.ov.get(S.sel)||{});
+  correct(b.dataset.act);});
+function rejAct(act){const id=S.rejSel;if(!(id>0)||!S.cls)return;
+  if(act==='rejInj')S.rejOv.set(id,true);else if(act==='rejNon')S.rejOv.set(id,false);else if(act==='rejCat')S.rejOv.delete(id);
+  else if(act==='rejFib'){S.polys.push({t:'fiber',rej:id,seg:S.seg});const n0=S.seg.n,d=applyManual();classify();render();showResults();
+    if(S.seg.n>n0){select(S.seg.n,false);toast(`已转为纤维 ${S.seg.n}。 Converted to fiber ${S.seg.n}.`);}else toast('无法转换：该区域已没有空余像素。 Could not convert: no free pixels left in this region.');return;}
+  buildExtra();classify();render();showResults();}
+function correct(act){if(!S.cls||!S.sel)return;const r=S.cls.rows[S.sel-1],o=Object.assign({},S.ov.get(S.sel)||{});
+  if(act==='cen')o.central=!r.cen;else if(act==='red')o.red=!r.pos;else if(act==='ex')o.ex=!r.exc;else{S.ov.delete(S.sel);refreshCls();return;}
+  if(o.central===r.auto)delete o.central;if(o.red===r.posAuto)delete o.red;if(!o.ex)delete o.ex;
+  if(Object.keys(o).length)S.ov.set(S.sel,o);else S.ov.delete(S.sel);refreshCls();}
+document.addEventListener('keydown',e=>{if(!S.cls||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA'))return;
+  const k=e.key.toLowerCase();if(!S.sel&&S.rejSel>0){const m={i:'rejInj',n:'rejNon',f:'rejFib'}[k];if(m){e.preventDefault();rejAct(m);}return;}
+  if(!S.sel)return;const m={c:'cen',r:'red',x:'ex'}[k];if(m){e.preventDefault();correct(m);}});
+$('expCsv').addEventListener('click',()=>{if(S.cls)save(`纤维定量-${stamp()}.csv`,csv(),'text/csv');});
+$('expPng').addEventListener('click',()=>{if(!S.work)return;cv.toBlob(b=>{if(b)save(`叠加图-${stamp()}.png`,b,'image/png');},'image/png');});
+window.addEventListener('resize',()=>{if(S.work&&S.zoom&&cv.offsetWidth<stage.clientWidth&&cv.offsetHeight<stage.clientHeight)fit();});
+
+(async()=>{try{if(window.claude&&typeof claude.use==='function')dl=await claude.use('downloads');}catch(e){dl=null;}})();
+showResults();
+window.__fq={S,run,makeDemo};
+})();
+</script>
+</body>
+</html>
