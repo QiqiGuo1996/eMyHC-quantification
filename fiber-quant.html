@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako.min.js" integrity="sha384-4NCF4sE5VX/W8Juvr+V9At6hCk146OuwgRSD6r857Tlar3RMK6IkyQ7W0xnNCZnG" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js" integrity="sha384-RyBmXHdfZ/Uon+ud+/AqSyWpUWnKYt2tkRG/P4gWoRUGDU+qIAV3tGBPNlYTBZEF" crossorigin="anonymous"></script>
 <style>
 :root{
   box-sizing:border-box;
@@ -135,7 +135,7 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
 </head>
 <body>
 <header class="top">
-  <h1>肌纤维损伤区定量 <small style="font-size:12px;font-weight:500;color:var(--muted)">v1.10.0</small><span class="en">Muscle fiber injury quantification</span></h1>
+  <h1>肌纤维损伤区定量 <small style="font-size:12px;font-weight:500;color:var(--muted)">v1.11.0</small><span class="en">Muscle fiber injury quantification</span></h1>
   <p>按WGA轮廓分割每根肌纤维，以中心区有无细胞核界定损伤纤维，计算红色阳性面积占损伤区面积的比例。图像只在本机浏览器中处理，不会上传。<span class="en">Segments fibers from WGA outlines, defines injured fibers by nuclei in the fiber core, and measures red-positive area as a share of the injured area. Images are processed locally in your browser and never uploaded.</span></p>
 </header>
 
@@ -147,8 +147,13 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
       <input type="file" id="file" accept=".tif,.tiff,.png,.jpg,.jpeg">
       <button class="btn" id="demo" type="button">用示例图试一试<span class="en">Try a sample image</span></button>
     </div>
-    <div class="hint" style="margin-top:8px">支持RGB合成图（PNG、JPG、TIFF），以及每页一个通道的多页TIFF（8位或16位）。超过4 GB的BigTIFF需先在Fiji中缩小另存。<span class="en">Accepts RGB composites (PNG, JPG, TIFF) and multi-page TIFFs with one channel per page (8- or 16-bit). BigTIFF files over 4 GB must be downscaled in Fiji first.</span></div>
+    <div class="hint" style="margin-top:8px">支持RGB合成图（PNG、JPG、TIFF），以及每页一个通道的多页TIFF（8位、16位或32位浮点）。超过4 GB的BigTIFF需先在Fiji中缩小另存。<span class="en">Accepts RGB composites (PNG, JPG, TIFF) and multi-page TIFFs with one channel per page (8-bit, 16-bit or 32-bit float). BigTIFF files over 4 GB must be downscaled in Fiji first.</span></div>
     <div class="meta" id="meta"></div>
+    <div class="field wide"><label for="bitScale">16/32位图像亮度换算<span class="en">Intensity scaling (16/32-bit)</span></label>
+      <select id="bitScale"><option value="auto">自动拉伸 Per-image</option><option value="fixed">固定范围 Fixed range</option></select></div>
+    <div class="field wide"><label>固定范围（原始灰度值）<span class="en">Fixed range (raw values)</span></label>
+      <div class="pair"><input type="number" id="rawMin" value="0" step="any" aria-label="固定范围下限" disabled><input type="number" id="rawMax" value="65535" step="any" aria-label="固定范围上限" disabled></div>
+      <div class="hint">自动拉伸把每张图的每个通道按其自身0.05%–99.95%亮度换算到0–255，固定阈值在不同图像间对应不同的原始亮度。要在整批图像中使用固定阈值，请选"固定范围"，所有图像按同一原始灰度范围换算（12位相机取0–4095）。8位图像不受影响。<span class="en">Per-image stretch rescales each channel between its own 0.05th and 99.95th percentiles, so a fixed threshold means a different raw intensity in each image. To use fixed thresholds across a batch, choose Fixed range: every image is converted with the same raw range (0–4095 for 12-bit cameras). 8-bit images are not affected.</span></div></div>
   </section>
 
   <section class="step">
@@ -349,7 +354,7 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
 <script>
 (function(){
 "use strict";
-const VERSION="1.10.0";
+const VERSION="1.11.0";
 const $=id=>document.getElementById(id);
 const tick=()=>new Promise(r=>setTimeout(r,0));
 const S={src:null,work:null,seg:null,nuc:null,mk:null,cls:null,ov:new Map(),sel:0,zoom:1,keys:{},busy:false,rejOv:new Map(),polys:[],dense:null,extra:null,drawMode:null,cur:null};
@@ -365,28 +370,37 @@ function fmtArea(um2){return um2>=1e5?fmt(um2/1e6,3)+' mm²':fmt(um2,0)+' µm²'
 const num=id=>{const v=parseFloat($(id).value);return Number.isFinite(v)?v:0;};
 
 /* ---------- Image loading ---------- */
-function stretch16(vals){ // Uint16Array -> Uint8Array with 0.05/99.95 percentile
+function rawScale(){ // intensity scaling for 16/32-bit images: per-image percentile stretch or one fixed raw range
+  if($('bitScale').value!=='fixed')return {mode:'auto'};const min=parseFloat($('rawMin').value),max=parseFloat($('rawMax').value);
+  if(!(Number.isFinite(min)&&Number.isFinite(max)&&max>min))throw bi('请填写有效的固定范围（上限须大于下限）。','Enter a valid fixed range (maximum above minimum).');
+  return {mode:'fixed',min,max};
+}
+function toU8(vals,a,b){if(b<=a)b=a+1;const n=vals.length,k=255/(b-a),o=new Uint8Array(n);
+  for(let i=0;i<n;i++){const v=(vals[i]-a)*k;o[i]=v>0?(v>255?255:v):0;}return {o,r:[a,b]};}
+function stretch16(vals,sc){ // Uint16Array -> Uint8Array, 0.05/99.95 percentile or fixed range
+  if(sc.mode==='fixed')return toU8(vals,sc.min,sc.max);
   const n=vals.length,h=new Uint32Array(65536);for(let i=0;i<n;i++)h[vals[i]]++;
   const lo=n*0.0005,hi=n*0.9995;let c=0,a=0,b=65535,fa=false;
   for(let v=0;v<65536;v++){c+=h[v];if(!fa&&c>=lo){a=v;fa=true;}if(c>=hi){b=v;break;}}
-  if(b<=a)b=a+1;const k=255/(b-a),o=new Uint8Array(n);
-  for(let i=0;i<n;i++){const v=(vals[i]-a)*k;o[i]=v<0?0:v>255?255:v;}return o;
+  return toU8(vals,a,b);
 }
-function stretchF(vals){
+function stretchF(vals,sc){
+  if(sc.mode==='fixed')return toU8(vals,sc.min,sc.max);
   const n=vals.length,step=Math.max(1,Math.floor(n/200000)),s=[];for(let i=0;i<n;i+=step)if(Number.isFinite(vals[i]))s.push(vals[i]);
-  s.sort((x,y)=>x-y);const a=s[Math.floor(s.length*0.0005)]||0;let b=s[Math.floor(s.length*0.9995)]||1;if(b<=a)b=a+1;
-  const k=255/(b-a),o=new Uint8Array(n);for(let i=0;i<n;i++){const v=(vals[i]-a)*k;o[i]=v>0?(v>255?255:v):0;}return o;
+  s.sort((x,y)=>x-y);const a=s[Math.floor(s.length*0.0005)]||0,b=s[Math.floor(s.length*0.9995)]||1;
+  return toU8(vals,a,b);
 }
-function decodeTiff(buf){
+function decodeTiff(buf,sc){
   if(!window.UTIF)throw bi('TIFF读取组件未能加载。请检查网络后刷新页面，或在Fiji中把图像另存为PNG再载入。','The TIFF reader failed to load. Check your connection and reload, or save the image as PNG in Fiji.');
   const ifds=UTIF.decode(buf);const ch=[];let w=0,h=0,page=0;const RGB=['红','绿','蓝'];
-  const conv=(ifd,spp,s,planar)=>{ // one sample of a decoded ifd -> Uint8Array
+  const conv=(ifd,spp,s,planar)=>{ // one sample of a decoded ifd -> {o: Uint8Array, r: raw range mapped to 0-255}
     const bps=ifd.t258?ifd.t258[0]:1,sf=ifd.t339?ifd.t339[0]:1,ph=ifd.t262?ifd.t262[0]:1,n=w*h,d=ifd.data;
-    const dv=new DataView(d.buffer,d.byteOffset,d.byteLength),ix=i=>planar?i:i*spp+s;let o;
-    if(bps===8){o=new Uint8Array(n);for(let i=0;i<n;i++)o[i]=d[ix(i)];if(ph===0)for(let i=0;i<n;i++)o[i]=255-o[i];}
-    else if(bps===16){const v=new Uint16Array(n);for(let i=0;i<n;i++)v[i]=dv.getUint16(ix(i)*2,true);o=stretch16(v);}
-    else if(bps===32&&sf===3){const v=new Float32Array(n);for(let i=0;i<n;i++)v[i]=dv.getFloat32(ix(i)*4,true);o=stretchF(v);}
-    return o;};
+    const dv=new DataView(d.buffer,d.byteOffset,d.byteLength),ix=i=>planar?i:i*spp+s;
+    if(bps===8){const o=new Uint8Array(n);for(let i=0;i<n;i++)o[i]=d[ix(i)];if(ph===0)for(let i=0;i<n;i++)o[i]=255-o[i];return {o};}
+    // UTIF converts 16-bit samples to little-endian, but leaves 32-bit samples in the file's byte order
+    if(bps===16){const v=new Uint16Array(n);for(let i=0;i<n;i++)v[i]=dv.getUint16(ix(i)*2,true);return stretch16(v,sc);}
+    if(bps===32&&sf===3){const v=new Float32Array(n),le=ifd.isLE!==false;for(let i=0;i<n;i++)v[i]=dv.getFloat32(ix(i)*4,le);return stretchF(v,sc);}
+    return null;};
   for(const ifd of ifds){
     if(ch.length>=8)break;
     if(ifd.t254&&(ifd.t254[0]&1))continue;
@@ -403,17 +417,17 @@ function decodeTiff(buf){
         const o=Object.assign({},ifd);o.t258=[bps];o.t277=[1];o.t284=[1];o.t262=[1];delete o.data;
         o[offK]=ifd[offK].slice(s*per,(s+1)*per);if(ifd[cntK])o[cntK]=ifd[cntK].slice(s*per,(s+1)*per);
         try{UTIF.decodeImage(buf,o,ifds);}catch(e){continue;}if(!o.data)continue;
-        const c=conv(o,1,0,true);if(c)ch.push({name:nm(s),data:c});
+        const c=conv(o,1,0,true);if(c)ch.push({name:nm(s),data:c.o,range:c.r});
       }
       continue;
     }
     try{UTIF.decodeImage(buf,ifd,ifds);}catch(e){continue;}
     if(!ifd.data)continue;
     if(ph===3||!ok){const rgba=UTIF.toRGBA8(ifd),n=w*h;for(let s=0;s<3;s++){const o=new Uint8Array(n);for(let i=0;i<n;i++)o[i]=rgba[i*4+s];ch.push({name:`第${page}页 ${RGB[s]}`,data:o});}continue;}
-    for(let s=0;s<Math.min(spp,spp>=3?3:1);s++){const c=conv(ifd,spp,s,false);if(c)ch.push({name:nm(s),data:c});}
+    for(let s=0;s<Math.min(spp,spp>=3?3:1);s++){const c=conv(ifd,spp,s,false);if(c)ch.push({name:nm(s),data:c.o,range:c.r});}
   }
   if(!ch.length)throw bi('没有在这个TIFF中找到可读取的图像。请在Fiji中另存为普通TIFF或PNG后重试。','No readable image found in this TIFF. Save it as a standard TIFF or PNG in Fiji and try again.');
-  const out={w,h,ch,pre:1};
+  const out={w,h,ch,pre:1,hi:ch.some(c=>c.range),sc};
   try{const u=new Uint8Array(buf),key=new TextEncoder().encode('<Calibration Type="System.Double">');let at=-1;
     for(let i=0;i<u.length-key.length&&at<0;i++){if(u[i]!==key[0])continue;let ok=true;for(let j=1;j<key.length;j++)if(u[i+j]!==key[j]){ok=false;break;}if(ok)at=i+key.length;}
     if(at>0){let s2='';for(let i=at;i<at+30&&u[i]!==60;i++)s2+=String.fromCharCode(u[i]);const dv2=new DataView(new ArrayBuffer(8));dv2.setBigInt64(0,BigInt(s2.trim()),true);const nm=dv2.getFloat64(0,true);
@@ -454,8 +468,16 @@ async function loadFile(file){
     const big=(b[0]===0x49&&b[1]===0x49&&b[2]===43)||(b[0]===0x4D&&b[1]===0x4D&&b[3]===43);
     const tif=(b[0]===0x49&&b[1]===0x49&&b[2]===42)||(b[0]===0x4D&&b[1]===0x4D&&b[3]===42);
     if(big)throw bi('这是BigTIFF格式（常见于超大拼接图），浏览器无法读取。请在Fiji中用 Image › Scale 缩小后另存为普通TIFF或PNG。','This is a BigTIFF (common for very large stitched images), which browsers cannot read. Downscale it in Fiji with Image › Scale and save as a standard TIFF or PNG.');
-    const src=tif?decodeTiff(buf):await decodeBitmap(file);
-    setSource(src,file.name);
+    const src=tif?decodeTiff(buf,rawScale()):await decodeBitmap(file);
+    S.file=tif?file:null;setSource(src,file.name);
+  }catch(e){console.error(e);status(e.message||'读取失败。',e.en||(e.message?'':'Reading failed.'),0,true);}
+}
+async function rescaleSource(){ // re-read the loaded 16/32-bit TIFF with the current intensity scaling; settings and drawings are kept
+  if(!S.file||!S.src||!S.src.hi||S.busy)return;
+  try{const sc=rawScale();status('正在按新的亮度换算重新读取…','Re-reading with the new intensity scaling…',5);await tick();
+    const src=decodeTiff(await S.file.arrayBuffer(),sc),polys=S.polys,ids=['chMem','chNuc','chMk','pxUm'],keep=ids.map(id=>$(id).value),pxSrc=S.src.pxSrc;
+    setSource(src,S.name);ids.forEach((id,i)=>{$(id).value=keep[i];});S.src.pxSrc=pxSrc;S.polys=polys;updatePolyUI();updateWorkInfo();prepareWork();render();
+    status('已按新的亮度换算重新读取，请重新运行分析。','Re-read with the new intensity scaling. Run the analysis again.',0);
   }catch(e){console.error(e);status(e.message||'读取失败。',e.en||(e.message?'':'Reading failed.'),0,true);}
 }
 
@@ -612,7 +634,7 @@ async function segment(P,um,nucM,redM){
   const pa=um*um,map=new Int32Array(nAll+1),rmap=new Int32Array(nAll+1),fib=[null],rej=[null];
   const sol=P.solMin>0?solidity(L,bnd,area,nAll,w,h):null;
   for(let l=1;l<=nAll;l++){const a=area[l]*pa,ri=md[l]/3+0.5,shape=area[l]/(Math.PI*ri*ri),nf=nc[l]/area[l]*100,so=sol?sol[l]:1;let why='';
-    if(P.nb&&bd[l])why=a>P.aMax?'bg':'border';else if(a<P.aMin)why='small';else if(a>P.aMax)why='large';
+    if(bd[l]&&a>P.aMax)why='bg';else if(P.nb&&bd[l])why='border';else if(a<P.aMin)why='small';else if(a>P.aMax)why='large';
     else if(P.riMin>0&&ri*um<P.riMin)why='thin';
     else if(sol&&so<P.solMin)why='concave';
     else if(P.shapeMax>0&&shape>P.shapeMax)why='shape';else if(P.nucMax>0&&nucM&&nf>P.nucMax&&!(P.redKeep&&rc[l]/area[l]>=0.5))why='nuclei';
@@ -797,9 +819,11 @@ async function run(){
     const p=params();if(!(p.px>0))throw bi('请填写正确的像素尺寸。','Enter a valid pixel size.');
     prepareWork();const um=umPx();
     const kSeg=JSON.stringify([S.keys.work,p.px,p.mem]),kNuc=JSON.stringify([S.keys.work,p.px,p.nuc]),kMk=JSON.stringify([S.keys.work,p.px,p.mk]);
+    const kSeg2=kSeg+kNuc+((p.rs.on||p.mem.redKeep)?kMk:'')+(p.rs.on?JSON.stringify(p.rs):'');
+    if(S.seg&&S.keys.seg!==kSeg2&&(S.ov.size||S.rejOv.size)&&!confirm('参数已更改，需要重新分割纤维。这会清除对纤维和未识别区域的手动修正（圈画的区域会保留）。继续吗？\n\nSettings have changed and fibers must be segmented again. This discards manual corrections of fibers and undetected regions (drawings are kept). Continue?')){
+      status('已取消，手动修正保持不变。','Cancelled; manual corrections are unchanged.',0);return;}
     if(S.keys.nuc!==kNuc){S.nuc=await mask(S.work.nuc,p.nuc,um,['识别细胞核…','Detecting nuclei…'],8);S.keys.nuc=kNuc;}
     if(S.keys.mk!==kMk){S.mk=await mask(S.work.mk,p.mk,um,['识别红色阳性像素…','Detecting red+ pixels…'],12);S.keys.mk=kMk;}
-    const kSeg2=kSeg+kNuc+((p.rs.on||p.mem.redKeep)?kMk:'')+(p.rs.on?JSON.stringify(p.rs):'');
     if(S.keys.seg!==kSeg2){S.seg=await segment(p.mem,um,S.nuc.m,S.mk.base||S.mk.m);
       if(p.rs.on){status('用红色信号补充识别小纤维…','Detecting small red+ fibers…',70);await tick();const sm=redSeedMask(p.rs,um);S.seg.redThr=sm.thr;S.seg.redN=addRedFibers(S.seg,sm.m,p.rs,um);}
       S.keys.seg=kSeg2;S.sel=0;S.rejSel=0;S.ov.clear();S.rejOv.clear();}
@@ -810,8 +834,9 @@ async function run(){
     showDiag(p);
     if(S.seg.n)status(`完成：识别 ${S.seg.n} 根纤维。`,`Done: ${S.seg.n} fibers detected.`,100);else status('没有识别到纤维。请检查WGA通道选择、阈值和面积范围。','No fibers detected. Check the WGA channel, threshold and area range.',100,true);
     $('expCsv').disabled=$('expPng').disabled=!S.seg.n;
-  }catch(e){console.error(e);if(e&&e.en)status(e.message,e.en,0,true);else status('分析失败，可能是图像过大导致内存不足。请增大缩小倍数后重试。','Analysis failed, probably because the image is too large for browser memory. Increase the downscale factor and try again.',0,true);}
-  S.busy=false;$('run').disabled=false;
+  }catch(e){console.error(e);if(e&&e.en)status(e.message,e.en,0,true);
+    else{const m=e&&e.message?e.message:String(e);status(`分析失败：${m}。如果图像很大，可能是浏览器内存不足，请增大缩小倍数后重试。`,`Analysis failed: ${m}. If the image is large, the browser may have run out of memory; increase the downscale factor and try again.`,0,true);}}
+  finally{S.busy=false;$('run').disabled=false;}
 }
 
 /* ---------- Rendering ---------- */
@@ -954,7 +979,10 @@ function csv(){
   L.push(['工具版本 Tool version',VERSION].join(','),['分析时间 Analyzed at',new Date().toISOString()].join(','),['图像 Image',q(S.name||'')].join(','));
   L.push([q('处理分辨率 Working resolution (µm/px)'),um.toFixed(4)].join(','),[q('原图像素尺寸 Original pixel size (µm/px)'),(p.px*S.src.pre).toFixed(4)].join(','),[q('缩放方式 Rescaling'),p.scale==='target'?'统一分辨率 common '+num('targetUm'):p.scale].join(','),[q('WGA阈值 WGA threshold'),S.seg.thr].join(','),[q('细胞核阈值 Nuclear threshold'),S.nuc.thr].join(','),[q('红色阈值 Red threshold'),S.mk.thr].join(','),
     [q('膜加粗 Membrane dilation (px)'),p.mem.dil].join(','),[q('第二遍膜加粗 Second-pass dilation (px)'),p.mem.dil2>=0?p.mem.dil2:'否 no'].join(','),[q('红色阳性区域不按细胞核剔除 Red+ regions exempt from nuclear filter'),p.mem.redKeep?'是 yes':'否 no'].join(','),[q('像素尺寸来源 Pixel size source'),S.src.pxSrc==='meta'?'Keyence metadata':'manual'].join(','),[q('最小凸度 Min. solidity'),p.mem.solMin].join(','),[q('最小内切半径 Min. inscribed radius (µm)'),p.mem.riMin].join(','),[q('最大形状指数 Max. shape index'),p.mem.shapeMax].join(','),[q('纤维内最大细胞核占比 Max. nuclear area in fiber (%)'),p.mem.nucMax].join(','),[q('面积范围 Area range (µm²)'),q(p.mem.aMin+'-'+p.mem.aMax)].join(','),[q('中心区内缩 Core inset (µm)'),p.cls.inset].join(','),
-    [q('中心区最小核面积 Min. core nuclear area (µm²)'),p.cls.minNuc].join(','),[q('阳性纤维面积占比 Red+ fiber area fraction (%)'),p.cls.frac].join(','),[q('阳性判定外扩距离 Margin for red+ call (µm)'),p.cls.band].join(','),[q('红色补充识别小纤维 Red-detected small fibers'),p.rs.on?`${p.rs.minA}-${p.rs.maxA} µm², thr ${S.seg.redThr} (n=${S.seg.redN||0})`:'否 no'].join(','),[q('红色面积计算方式 Red+ area method'),p.cls.mode==='fiber'?'阳性纤维整根 whole red+ fibers':'按像素 pixels'].join(','),[q('红色手动修正纤维数 Fibers with manual red call'),c.rows.filter(x=>x.manualRed).length].join(','),[q('红色阳性纤维计入损伤区 Red+ fibers counted as injured'),p.cls.incl?'是 yes':'否 no'].join(','),[q('自动识别DAPI密集区 Auto DAPI-dense'),p.dn.auto?'是 yes':'否 no'].join(','),[q('密度半径 Density radius (µm)'),p.dn.r].join(','),[q('核覆盖率阈值 Nuclear coverage (%)'),p.dn.pct].join(','),[q('最小区域面积 Min. region area (µm²)'),p.dn.min].join(','),[q('计入的未识别区域类别 Undetected region categories counted as injured'),q(['inter','large','small','border'].filter(k=>p.dn.inc[k]).join(' ')||'none')].join(','),[q('单独设置的未识别区域数 Individually toggled undetected regions'),S.rejOv.size].join(','));
+    [q('中心区最小核面积 Min. core nuclear area (µm²)'),p.cls.minNuc].join(','),[q('阳性纤维面积占比 Red+ fiber area fraction (%)'),p.cls.frac].join(','),[q('阳性判定外扩距离 Margin for red+ call (µm)'),p.cls.band].join(','),[q('红色补充识别小纤维 Red-detected small fibers'),q(p.rs.on?`${p.rs.minA}-${p.rs.maxA} µm², thr ${S.seg.redThr} (n=${S.seg.redN||0})`:'否 no')].join(','),[q('红色面积计算方式 Red+ area method'),p.cls.mode==='fiber'?'阳性纤维整根 whole red+ fibers':'按像素 pixels'].join(','),[q('红色手动修正纤维数 Fibers with manual red call'),c.rows.filter(x=>x.manualRed).length].join(','),[q('红色阳性纤维计入损伤区 Red+ fibers counted as injured'),p.cls.incl?'是 yes':'否 no'].join(','),[q('自动识别DAPI密集区 Auto DAPI-dense'),p.dn.auto?'是 yes':'否 no'].join(','),[q('密度半径 Density radius (µm)'),p.dn.r].join(','),[q('核覆盖率阈值 Nuclear coverage (%)'),p.dn.pct].join(','),[q('最小区域面积 Min. region area (µm²)'),p.dn.min].join(','),[q('计入的未识别区域类别 Undetected region categories counted as injured'),q(['inter','large','small','border'].filter(k=>p.dn.inc[k]).join(' ')||'none')].join(','),[q('单独设置的未识别区域数 Individually toggled undetected regions'),S.rejOv.size].join(','));
+  {const hi=S.src.hi,sc=S.src.sc,rg=i=>{const r=S.src.ch[i].range;return r?`${+r[0].toPrecision(6)}-${+r[1].toPrecision(6)}`:'8-bit';};
+   L.push([q('16/32位亮度换算 Intensity scaling (16/32-bit)'),q(!hi?'不适用 n/a (8-bit)':sc.mode==='fixed'?`固定范围 fixed range ${sc.min}-${sc.max}`:'每张图自动拉伸 per-image stretch')].join(','),
+     [q('换算到0-255的原始范围 Raw range mapped to 0-255 (WGA; DAPI; red)'),q(hi?[p.ch.mem,p.ch.nuc,p.ch.mk].map(rg).join('; '):'n/a')].join(','));}
   L.push('# 每根纤维 Per fiber');
   L.push('编号 ID,面积 Area (µm²),中心区面积 Core area (µm²),中心区核面积 Core nuclear area (µm²),红色占比 Red fraction (%),计入红色阳性面积 Red+ area counted (µm²),自动判定中央核 Auto central,最终判定中央核 Final central,自动红色阳性 Auto red+,最终红色阳性 Final red+,损伤区 Injured,中央核手动修正 Central manual,红色手动修正 Red manual,手动圈画纤维 Drawn fiber,红色补充识别 Red-detected,已排除 Excluded,质心x Centroid x (px),质心y Centroid y (px)');
   for(const r of c.rows)L.push([r.id,r.area.toFixed(1),r.core.toFixed(1),r.nuc.toFixed(2),r.frac.toFixed(2),r.redA.toFixed(1),r.auto?1:0,r.cen?1:0,r.posAuto?1:0,r.pos?1:0,r.inj?1:0,r.manual?1:0,r.manualRed?1:0,r.drawn?1:0,r.redDet?1:0,r.exc?1:0,r.cx.toFixed(1),r.cy.toFixed(1)].join(','));
@@ -972,6 +1000,8 @@ $('file').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadFile(
 $('demo').addEventListener('click',()=>{status('正在生成示例图…','Generating sample image…',5);setTimeout(()=>{makeDemo();},20);});
 $('run').addEventListener('click',run);
 $('scale').addEventListener('change',()=>{$('targetUm').disabled=$('scale').value!=='target';});
+$('bitScale').addEventListener('change',()=>{$('rawMin').disabled=$('rawMax').disabled=$('bitScale').value!=='fixed';rescaleSource();});
+['rawMin','rawMax'].forEach(id=>$(id).addEventListener('change',()=>{if($('bitScale').value==='fixed')rescaleSource();}));
 $('targetUm').addEventListener('input',updateWorkInfo);
 ['chMem','chNuc','chMk','scale'].forEach(id=>$(id).addEventListener('change',()=>{if(!S.src)return;updateWorkInfo();const changed=prepareWork();if(changed){render();fit();showResults();$('expCsv').disabled=$('expPng').disabled=true;status('通道或尺寸已更改，请重新运行分析。','Channels or size changed. Run the analysis again.',0);}}));
 $('pxUm').addEventListener('input',()=>{if(S.src)S.src.pxSrc='manual';updateWorkInfo();});
@@ -1039,6 +1069,7 @@ window.addEventListener('resize',()=>{if(S.work&&S.zoom&&cv.offsetWidth<stage.cl
 
 (async()=>{try{if(window.claude&&typeof claude.use==='function')dl=await claude.use('downloads');}catch(e){dl=null;}})();
 showResults();
+$('rawMin').disabled=$('rawMax').disabled=$('bitScale').value!=='fixed'; // browsers may restore the select after a reload
 window.__fq={S,run,makeDemo};
 })();
 </script>
