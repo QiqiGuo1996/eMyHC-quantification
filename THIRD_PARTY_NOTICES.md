@@ -1,6 +1,6 @@
 # Third-party notices
 
-`fiber-quant.html` loads the following open-source libraries from public content delivery networks at run time. They are used only to read TIFF files.
+`fiber-quant.html` loads the following open-source libraries from public content delivery networks at run time. They are used only to read TIFF files. Both are loaded with Subresource Integrity hashes, so the browser refuses any file that differs from the listed version.
 
 | Library | Version | Source | License |
 | --- | --- | --- | --- |

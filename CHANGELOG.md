@@ -2,6 +2,22 @@
 
 All notable changes to FiberQuant are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.11.0] – [YYYY-MM-DD]
+
+### Added
+- Intensity scaling option for 16-bit and 32-bit images. *Fixed range* converts every image with the same raw minimum and maximum, so fixed thresholds mean the same raw intensity in every image; *Per-image stretch* (the previous behavior) remains the default. The mode and the raw range applied to each channel are exported to CSV.
+- Online version through GitHub Pages.
+
+### Fixed
+- 32-bit floating-point TIFFs saved in big-endian byte order (the ImageJ/Fiji default) were decoded as noise.
+- With *Exclude fibers touching the image edge* switched off, the background outside the section was treated as an oversized region and could be counted as injured.
+- The CSV value for red-detected small fibers contained an unquoted comma, which split the row across columns.
+
+### Changed
+- Re-running the analysis with settings that require new segmentation now asks before discarding manual corrections.
+- When an analysis fails, the underlying error is shown instead of always suggesting a memory problem.
+- The TIFF reader libraries are loaded with Subresource Integrity checks.
+
 ## [1.10.0] – [YYYY-MM-DD]
 
 ### Added

@@ -1,6 +1,12 @@
 # FiberQuant: browser-based quantification of muscle injury and regeneration
 
+English | [中文](README.zh-CN.md)
+
+<!-- Add the Zenodo DOI badge once the software has a DOI:
 [![DOI](https://zenodo.org/badge/DOI/[DOI].svg)](https://doi.org/[DOI])
+-->
+
+**Use it online:** https://qiqiguo1996.github.io/muscle_image/
 
 FiberQuant segments skeletal muscle fibers from wheat germ agglutinin (WGA) staining, identifies centrally nucleated fibers (CNFs) to define the injured region, and measures the area fraction of a positive marker (for example, embryonic myosin heavy chain, eMyHC) within that region.
 
@@ -13,16 +19,17 @@ This repository accompanies: [Authors]. [Title]. *[Journal]* ([year]). https://d
 | File | Description |
 | --- | --- |
 | `fiber-quant.html` | The complete tool (HTML, CSS and JavaScript) |
+| `index.html` | Entry page for the online version; opens `fiber-quant.html` |
 | `README.md` | This document |
 | `README.zh-CN.md` | Chinese version of this document |
 | `CHANGELOG.md` | Version history |
 | `CITATION.cff` | Citation metadata |
 | `LICENSE` | MIT License |
-| `THIRD_PARTY_NOTICES.md` | Licenses of bundled third-party libraries |
+| `THIRD_PARTY_NOTICES.md` | Licenses of third-party libraries loaded at run time |
 
 ## Quick start
 
-1. Download `fiber-quant.html` and open it in Chrome, Edge, Firefox or Safari (versions released in 2023 or later).
+1. Open https://qiqiguo1996.github.io/muscle_image/, or download `fiber-quant.html` and open it in Chrome, Edge, Firefox or Safari (versions released in 2023 or later). Images are processed in the browser in both cases.
 2. Click **Try a sample image** to explore the workflow on a synthetic image, or load your own image.
 3. Assign the WGA, DAPI and marker channels, and enter the pixel size of the original image (µm per pixel).
 4. Click **Run analysis**, inspect the overlay, correct misclassified fibers, and export the results as CSV.
@@ -34,15 +41,16 @@ Reading TIFF files requires an internet connection the first time, because the T
 - Transverse cryosections stained with WGA (fiber outlines), DAPI (nuclei) and one marker of interest.
 - Either an RGB composite (PNG, JPG or TIFF) or a multichannel TIFF with one channel per page (8-bit, 16-bit or 32-bit float), such as files saved by Fiji/ImageJ.
 - BigTIFF files (usually over 4 GB) cannot be read by browsers. Downscale them first in Fiji (*Image › Scale*) and save as a standard TIFF.
-- Very large images are downscaled automatically to at most about 20 megapixels for processing. The effective pixel size is shown in the interface and recorded in the exported CSV.
+- Very large images are downscaled automatically to at most about 20 megapixels for processing (PNG and JPG files to about 16 megapixels when they are loaded). The effective pixel size is shown in the interface and recorded in the exported CSV.
+- For 16-bit and 32-bit images, set *Intensity scaling* under *Load image*. Use *Fixed range* whenever thresholds are fixed for a whole experiment (see step 1 of the analysis workflow).
 
 Keyence BZ-X stitched images: the software may downscale stitched images on saving, by a factor that depends on the number of tiles, so pixel size can differ between images acquired with identical settings. FiberQuant reads the calibration from Keyence TIFF metadata automatically and fills in the pixel size; files re-saved by other software usually lose this metadata, and the pixel size must then be entered by hand. To analyze a batch at identical resolution, set *Downscale for processing* to *Common*: each image is rescaled from its own pixel size to the common working resolution, so pixel-based parameters such as membrane dilation mean the same in every image.
 
 ## Analysis workflow
 
-**1. Intensity normalization.** For 16-bit and floating-point images, each channel is linearly rescaled to 8 bits between its 0.05th and 99.95th intensity percentiles. 8-bit images are used as is.
+**1. Intensity normalization.** 16-bit and floating-point images are linearly rescaled to 8 bits in one of two ways. With *Per-image stretch* (default), each channel is rescaled between its own 0.05th and 99.95th intensity percentiles; this gives good contrast, but the same 8-bit threshold then corresponds to a different raw intensity in each image, and a nearly empty channel (such as a secondary-only control) is stretched to full range. With *Fixed range*, every channel of every image is rescaled between the same raw minimum and maximum (for example 0–4095 for a 12-bit camera), so fixed thresholds are comparable across images. The raw range applied to each channel is recorded in the CSV. 8-bit images are used as is.
 
-**2. Fiber segmentation.** The WGA channel is background-subtracted using a smoothed, bilinearly interpolated map of local minima, smoothed with a Gaussian filter (approximated by three successive box filters) and thresholded (Otsu's method¹ by default). The membrane mask is dilated to separate touching fibers. Connected regions outside the membrane (4-connectivity) are labeled as fibers, grown back into the dilated band to restore their outlines, and enclosed unlabeled pockets (for example around nuclei) are filled. A second pass with a smaller dilation (default 1 pixel) recovers small fibers erased by the first: its regions are added only where they overlap existing fibers by less than 10%, and pass the same filters. Regions are discarded if their area is outside the accepted range, if they touch the image border, if their largest inscribed radius is below the set minimum (narrow gaps between fibers), if their solidity (area divided by convex-hull area) is below the set minimum (concave gaps and interstitium squeezed between round fibers), if their shape index (area divided by the area of the largest inscribed circle) exceeds the set maximum, or if nuclei cover more than the set fraction of their area (regions that are at least half marker-positive are exempt, to protect small regenerating fibers with central nuclei); the last two criteria reject interstitium that would otherwise be mistaken for fibers.
+**2. Fiber segmentation.** The WGA channel is background-subtracted using a smoothed, bilinearly interpolated map of local minima, smoothed with a Gaussian filter (approximated by three successive box filters) and thresholded (Otsu's method¹ by default). The membrane mask is dilated to separate touching fibers. Connected regions outside the membrane (4-connectivity) are labeled as fibers, grown back into the dilated band to restore their outlines, and enclosed unlabeled pockets (for example around nuclei) are filled. A second pass with a smaller dilation (default 1 pixel) recovers small fibers erased by the first: its regions are added only where they overlap existing fibers by less than 10%, and pass the same filters. Regions are discarded if their area is outside the accepted range, if they touch the image border (regions that touch the border and exceed the maximum area are always treated as background outside the section), if their largest inscribed radius is below the set minimum (narrow gaps between fibers), if their solidity (area divided by convex-hull area) is below the set minimum (concave gaps and interstitium squeezed between round fibers), if their shape index (area divided by the area of the largest inscribed circle) exceeds the set maximum, or if nuclei cover more than the set fraction of their area (regions that are at least half marker-positive are exempt, to protect small regenerating fibers with central nuclei); the last two criteria reject interstitium that would otherwise be mistaken for fibers.
 
 **3. Nuclear and marker masks.** DAPI and marker channels are background-subtracted, smoothed (σ = 1 pixel) and thresholded in the same way.
 
@@ -65,6 +73,7 @@ Marker+ area is counted either as marker-positive pixels (default) or as the who
 
 | Group | Parameter | Default | Notes |
 | --- | --- | --- | --- |
+| Image | Intensity scaling (16/32-bit) | Per-image stretch | *Fixed range* (raw minimum–maximum, default 0–65535) makes fixed thresholds comparable across images; use 0–4095 for 12-bit cameras |
 | Scale | Original pixel size | 0.65 µm/pixel | Must match the acquisition |
 | Scale | Downscale for processing | Auto | Auto keeps images at or below about 20 megapixels; *Common* rescales every image to the common working resolution |
 | Scale | Common working resolution | 0.91 µm/pixel | Used with *Common*; choose the coarsest resolution in the batch |
@@ -131,7 +140,7 @@ Trace missed fibers along their inner edge so that the membrane is not included.
 
 1. Summary values.
 2. Fiber area statistics (n, mean, SD, median) for injured, non-injured, marker+ injured and all fibers.
-3. Parameters, including tool version, analysis time, image name, thresholds actually applied and the number of manual corrections.
+3. Parameters, including tool version, analysis time, image name, intensity scaling and the raw range applied to each channel, thresholds actually applied and the number of manual corrections.
 4. One row per fiber: ID; area; core area; nuclear area in core; marker fraction; marker+ area counted; automatic and final CNF call; automatic and final marker call; injured; manual-correction flags; drawn fiber; marker-detected fiber; excluded; centroid coordinates.
 
 **PNG export:** the current overlay, including fiber IDs if displayed, for documentation.
@@ -147,7 +156,7 @@ Automated results should be validated against manual quantification before use i
 - Segmentation depends on continuous WGA membrane staining. Torn membranes, folds or strong interstitial staining can merge or split fibers; these should be corrected or excluded.
 - Fibers whose WGA ring is incomplete merge with the interstitium or the background and are not detected. Check the *Undetected regions* overlay and adjust membrane dilation or the WGA threshold.
 - Large infiltrated areas without membranes can be segmented as a single large "fiber" if their area falls within the accepted range. Exclude them and outline them as fiber-free injured areas instead.
-- The marker threshold strongly affects the result. In one test image, the marker+ fraction of the injured area was 25.9% with the automatic threshold (26), 11.3% at 40 and 3.8% at 60. Set a fixed marker threshold for the whole experiment, chosen so that secondary-only controls are essentially negative.
+- The marker threshold strongly affects the result. In one test image, the marker+ fraction of the injured area was 25.9% with the automatic threshold (26), 11.3% at 40 and 3.8% at 60. Set a fixed marker threshold for the whole experiment, chosen so that secondary-only controls are essentially negative. For 16-bit or 32-bit images, also set *Intensity scaling* to *Fixed range*; with per-image stretch, a fixed threshold does not correspond to the same raw intensity in every image.
 - Otsu thresholds are computed per image. When marker signal is sparse, the automatic threshold may be too low; inspect the *Red+ pixels* overlay and set a fixed threshold if needed.
 - The tool analyzes one image at a time.
 
@@ -155,7 +164,7 @@ Automated results should be validated against manual quantification before use i
 
 If you use FiberQuant, please cite the article above and the archived software version:
 
-> [Authors]. FiberQuant: browser-based quantification of muscle injury and regeneration (v1.10.0). *Zenodo* https://doi.org/[DOI] ([year]).
+> [Authors]. FiberQuant: browser-based quantification of muscle injury and regeneration (v1.11.0). *Zenodo* https://doi.org/[DOI] ([year]).
 
 Citation metadata are provided in `CITATION.cff`.
 
@@ -165,7 +174,7 @@ The source code was generated with the assistance of a large language model (Cla
 
 ## License
 
-FiberQuant is released under the MIT License (see `LICENSE`). Bundled third-party libraries are listed in `THIRD_PARTY_NOTICES.md`.
+FiberQuant is released under the MIT License (see `LICENSE`). Third-party libraries loaded at run time are listed in `THIRD_PARTY_NOTICES.md`.
 
 ## Contact
 

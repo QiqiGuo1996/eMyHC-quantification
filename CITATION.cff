@@ -1,11 +1,13 @@
-cff-version: 1.10.0
+cff-version: 1.2.0
 message: "If you use this software, please cite both the article and the archived software version."
 title: "FiberQuant: browser-based quantification of muscle injury and regeneration"
-version: 1.10.0
-date-released: "[YYYY-MM-DD]"
+version: 1.11.0
+# TODO: uncomment and fill in when the version is released and archived on Zenodo.
+# date-released: "YYYY-MM-DD"
+# doi: "10.5281/zenodo.XXXXXXX"
 license: MIT
-repository-code: "https://github.com/[user]/[repository]"
-doi: "[Zenodo DOI]"
+repository-code: "https://github.com/QiqiGuo1996/muscle_image"
+url: "https://qiqiguo1996.github.io/muscle_image/"
 type: software
 keywords:
   - skeletal muscle
@@ -17,13 +19,13 @@ authors:
   - family-names: "[Family name]"
     given-names: "[Given name]"
     affiliation: "[Institution]"
-    orcid: "https://orcid.org/[0000-0000-0000-0000]"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
 preferred-citation:
   type: article
   title: "[Article title]"
   journal: "[Journal]"
-  year: "[YYYY]"
-  doi: "[Article DOI]"
+  # year: YYYY
+  # doi: "10.XXXX/XXXXX"
   authors:
     - family-names: "[Family name]"
       given-names: "[Given name]"
