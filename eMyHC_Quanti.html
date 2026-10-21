@@ -121,6 +121,7 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
 .tag.ex{background:var(--soft);color:var(--muted)}
 .notes{padding:0 22px 30px;color:var(--muted);font-size:13px;max-width:80ch}
 .notes summary{cursor:pointer;color:var(--ink);font-weight:500}
+.hide{display:none!important}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.on{opacity:1}
 @media (max-width:860px){
@@ -135,7 +136,7 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
 </head>
 <body>
 <header class="top">
-  <h1>肌纤维损伤区定量 <small style="font-size:12px;font-weight:500;color:var(--muted)">v1.10.0</small><span class="en">Muscle fiber injury quantification</span></h1>
+  <h1>肌纤维损伤区定量 <small style="font-size:12px;font-weight:500;color:var(--muted)">v2.3.0</small><span class="en">Muscle fiber injury quantification</span></h1>
   <p>按WGA轮廓分割每根肌纤维，以中心区有无细胞核界定损伤纤维，计算红色阳性面积占损伤区面积的比例。图像只在本机浏览器中处理，不会上传。<span class="en">Segments fibers from WGA outlines, defines injured fibers by nuclei in the fiber core, and measures red-positive area as a share of the injured area. Images are processed locally in your browser and never uploaded.</span></p>
 </header>
 
@@ -147,6 +148,13 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
       <input type="file" id="file" accept=".tif,.tiff,.png,.jpg,.jpeg">
       <button class="btn" id="demo" type="button">用示例图试一试<span class="en">Try a sample image</span></button>
     </div>
+    <div class="file" style="margin-top:10px">
+      <button class="btn hide" id="cpRun" type="button" style="font-weight:600">用Cellpose分割（本机GPU）<span class="en">Segment with Cellpose (local GPU)</span></button>
+      <label class="btn" for="cpFile" style="cursor:pointer">导入Cellpose分割（可选）<span class="en">Import Cellpose masks (optional)</span></label>
+      <input type="file" id="cpFile" accept=".tif,.tiff" class="hide">
+      <button class="btn hide" id="cpClear" type="button">移除 Remove</button>
+    </div>
+    <div class="hint" id="cpInfo" style="margin-top:6px">先载入原图，再载入同一张图的Cellpose标签图（*_cp_masks.tif）。运行分析时将用它代替自动分割。<span class="en">Load the image first, then its Cellpose label image (*_cp_masks.tif). The analysis will use it instead of the automatic segmentation.</span></div>
     <div class="hint" style="margin-top:8px">支持RGB合成图（PNG、JPG、TIFF），以及每页一个通道的多页TIFF（8位或16位）。超过4 GB的BigTIFF需先在Fiji中缩小另存。<span class="en">Accepts RGB composites (PNG, JPG, TIFF) and multi-page TIFFs with one channel per page (8- or 16-bit). BigTIFF files over 4 GB must be downscaled in Fiji first.</span></div>
     <div class="meta" id="meta"></div>
   </section>
@@ -169,16 +177,17 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
     <h2><span class="num">3</span>分割与判定参数<span class="en i">Segmentation and classification</span></h2>
     <details class="group" open>
       <summary>纤维分割<span class="en i">Fiber segmentation</span></summary>
-      <div class="field"><label for="memBg">背景扣除半径（µm）<span class="en">Background radius (µm)</span></label><input type="number" id="memBg" value="40" min="0" step="5"></div>
-      <div class="field"><label for="memSig">平滑σ（像素）<span class="en">Smoothing σ (px)</span></label><input type="number" id="memSig" value="1" min="0" step="0.5"></div>
+      <div class="field hide"><label for="memBg">背景扣除半径（µm）<span class="en">Background radius (µm)</span></label><input type="number" id="memBg" value="40" min="0" step="5"></div>
+      <div class="field hide"><label for="memSig">平滑σ（像素）<span class="en">Smoothing σ (px)</span></label><input type="number" id="memSig" value="1" min="0" step="0.5"></div>
       <div class="field"><label for="memThr">阈值<span class="en">Threshold</span></label>
         <div class="thr"><input type="number" id="memThr" min="0" max="255" step="1" disabled><label><input type="checkbox" id="memAuto" checked>自动 Auto</label></div></div>
-      <div class="field"><label for="memDil">膜加粗（像素）<span class="en">Membrane dilation (px)</span></label><input type="number" id="memDil" value="3" min="0" max="8" step="1">
+      <div class="field hide"><label for="memDil">膜加粗（像素）<span class="en">Membrane dilation (px)</span></label><input type="number" id="memDil" value="3" min="0" max="8" step="1">
         <div class="hint">可封住WGA环上宽度约为2倍此值的缺口；纤维随后自动长回原轮廓。建议约4 µm对应的像素数（0.9 µm/像素时取4–5）。半径小于此值的小纤维会丢失。<span class="en">Closes gaps in WGA rings up to about twice this width; fibers then grow back to their outlines. About 4 µm in pixels is a good start (4–5 at 0.9 µm/px). Fibers with a radius below this value are lost.</span></div></div>
       <div class="field wide"><label>纤维面积范围（µm²）<span class="en">Fiber area range (µm²)</span></label>
-        <div class="pair"><input type="number" id="aMin" value="80" min="0" step="10" aria-label="最小面积"><input type="number" id="aMax" value="12000" min="0" step="500" aria-label="最大面积"></div></div>
-      <label class="check"><input type="checkbox" id="dil2On" checked><span>用较小的膜加粗再分割一遍，补回小纤维<span class="en">Second pass with smaller dilation to recover small fibers</span></span></label>
-      <div class="field"><label for="memDil2">第二遍膜加粗（像素）<span class="en">Second-pass dilation (px)</span></label><input type="number" id="memDil2" value="1" min="0" max="7" step="1">
+        <div class="pair"><input type="number" id="aMin" value="100" min="0" step="10" aria-label="最小面积"><input type="number" id="aMax" value="15000" min="0" step="500" aria-label="最大面积"></div>
+        <div class="hint">下限按膜内侧面积计算，用于排除纤维之间的小缝隙；分析很小的再生纤维时调低。<span class="en">The minimum applies to the area inside the membrane and removes small gaps between fibers; lower it for very small regenerating fibers.</span></div></div>
+      <label class="check hide"><input type="checkbox" id="dil2On" checked><span>用较小的膜加粗再分割一遍，补回小纤维<span class="en">Second pass with smaller dilation to recover small fibers</span></span></label>
+      <div class="field hide"><label for="memDil2">第二遍膜加粗（像素）<span class="en">Second-pass dilation (px)</span></label><input type="number" id="memDil2" value="1" min="0" max="7" step="1">
         <div class="hint">大的膜加粗会把小纤维整个腐蚀掉。第二遍只在第一遍没有纤维的地方补充，补出的区域同样经过面积、形状和细胞核筛选。<span class="en">Large dilation erases small fibers. The second pass only adds regions where the first found no fiber, and they pass the same area, shape and nuclear filters.</span></div></div>
       <label class="check"><input type="checkbox" id="noBorder" checked><span>排除接触图像边缘的纤维<span class="en">Exclude fibers touching the image edge</span></span></label>
     </details>
@@ -187,13 +196,13 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
       <div class="hint" style="margin:4px 0 6px">WGA环不完整时，纤维会经缺口与间质连成一片。先把"膜加粗"调到约4 µm对应的像素数来封住缺口，再用下面两项剔除被误当成纤维的间质。<span class="en">When WGA rings are incomplete, fibers merge with the interstitium through the gaps. First set membrane dilation to about 4 µm in pixels to close the gaps, then use these two filters to reject interstitium mistaken for fibers.</span></div>
       <div class="field"><label for="solMin">最小凸度<span class="en">Min. solidity</span></label><input type="number" id="solMin" value="0.9" min="0" max="1" step="0.01">
         <div class="hint">凸度 = 面积 ÷ 凸包面积，圆形、椭圆形纤维约为0.94–0.98；被几根纤维夹住的缝隙边缘内凹，通常低于0.9。设为0则不筛选。<span class="en">Solidity = area ÷ convex-hull area: about 0.94–0.98 for round or oval fibers, usually below 0.9 for gaps squeezed between fibers. 0 disables.</span></div></div>
-      <div class="field"><label for="riMin">最小内切半径（µm）<span class="en">Min. inscribed radius (µm)</span></label><input type="number" id="riMin" value="2.5" min="0" step="0.5">
+      <div class="field hide"><label for="riMin">最小内切半径（µm）<span class="en">Min. inscribed radius (µm)</span></label><input type="number" id="riMin" value="2.5" min="0" step="0.5">
         <div class="hint">区域内能放下的最大圆的半径。相邻纤维之间的缝隙很窄，低于此值的区域不算纤维；设为0则不筛选。<span class="en">Radius of the largest circle that fits in the region. Gaps between neighboring fibers are narrow; regions below this value are rejected. 0 disables.</span></div></div>
       <div class="field"><label for="shapeMax">最大形状指数<span class="en">Max. shape index</span></label><input type="number" id="shapeMax" value="4" min="0" step="0.5">
         <div class="hint">形状指数 = 面积 ÷ 最大内切圆面积，圆形为1，不规则的间质网络很大。超过此值的区域不算纤维；设为0则不筛选。<span class="en">Area ÷ area of the largest inscribed circle: 1 for a circle, large for branching interstitium. Regions above this value are rejected; 0 disables.</span></div></div>
-      <div class="field"><label for="nucMax">纤维内最大细胞核占比（%）<span class="en">Max. nuclear area in a fiber (%)</span></label><input type="number" id="nucMax" value="50" min="0" max="100" step="5">
+      <div class="field"><label for="nucMax">纤维内最大细胞核占比（%）<span class="en">Max. nuclear area in a fiber (%)</span></label><input type="number" id="nucMax" value="0" min="0" max="100" step="5">
         <div class="hint">细胞核占比超过此值的区域视为间质；设为0则不筛选。<span class="en">Regions with more nuclear area are treated as interstitium; 0 disables.</span></div></div>
-      <label class="check"><input type="checkbox" id="redKeep" checked><span>红色阳性占一半以上的区域不按细胞核占比剔除（保护含中央核的小再生纤维）<span class="en">Do not reject regions that are at least half red+ for nuclear content (protects small regenerating fibers with central nuclei)</span></span></label>
+      <label class="check hide"><input type="checkbox" id="redKeep" checked><span>红色阳性占一半以上的区域不按细胞核占比剔除（保护含中央核的小再生纤维）<span class="en">Do not reject regions that are at least half red+ for nuclear content (protects small regenerating fibers with central nuclei)</span></span></label>
     </details>
     <details class="group" open>
       <summary>中央核判定<span class="en i">Central nuclei</span></summary>
@@ -212,7 +221,7 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
       <div class="field"><label for="mkFrac">判为阳性纤维的面积占比（%）<span class="en">Area fraction for red+ fiber (%)</span></label><input type="number" id="mkFrac" value="20" min="0" max="100" step="5"></div>
       <div class="field"><label for="mkBand">阳性判定外扩距离（µm）<span class="en">Margin for red+ call (µm)</span></label><input type="number" id="mkBand" value="0" min="0" max="10" step="0.5">
         <div class="hint">判定阳性时把纤维轮廓向外扩这么多，用于红色集中在纤维外缘、落在分割轮廓之外的情况。建议1–3 µm；只影响阳性判定，不改变纤维面积。<span class="en">Extends each outline outward when calling red+, for red signal at the fiber rim just outside the segmented outline. 1–3 µm is typical; it affects only the call, not fiber area.</span></div></div>
-      <label class="check"><input type="checkbox" id="rsOn" checked><span>用红色信号补充识别漏掉的小纤维<span class="en">Detect small red+ fibers missed by WGA segmentation</span></span></label>
+      <label class="check"><input type="checkbox" id="rsOn"><span>用红色信号补充识别漏掉的小纤维<span class="en">Detect small red+ fibers missed by WGA segmentation</span></span></label>
       <div class="field wide"><label>补充识别面积范围（µm²）<span class="en">Area range for red-detected fibers (µm²)</span></label>
         <div class="pair"><input type="number" id="rsMin" value="40" min="0" step="5" aria-label="最小面积"><input type="number" id="rsMax" value="600" min="0" step="50" aria-label="最大面积"></div></div>
       <div class="field"><label for="rsThr">补充识别红色阈值<span class="en">Red threshold for detection</span></label>
@@ -331,8 +340,8 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
 
   <details class="notes">
     <summary>方法说明与注意事项<span class="en i">Method and notes</span></summary>
-    <p>纤维分割：WGA通道扣除背景并平滑后按阈值得到膜掩膜，取膜以外的连通区域为纤维，再按面积范围过滤。中央核判定：把每根纤维的轮廓向内缩一段距离得到中心区，中心区内细胞核掩膜面积达到设定值即判为中央核纤维。损伤区为全部中央核纤维的并集。</p>
-    <p lang="en">Fiber segmentation: the WGA channel is background-subtracted, smoothed and thresholded into a membrane mask; connected regions outside the membrane are fibers, filtered by area. Central nuclei: each fiber outline is shrunk inward to give a core; a fiber whose core contains at least the set nuclear area is centrally nucleated. The injured region is the union of all centrally nucleated fibers.</p>
+    <p>纤维分割：WGA通道扣除背景并平滑后，在强度图上寻找被亮环包围的暗区作为每根纤维的中心（h-minima），再从这些中心做分水岭，纤维边界落在WGA膜的中线；以0.7倍Otsu阈值得到膜掩膜，用于计算膜内侧面积、到膜的距离等。最后按膜内侧面积、内切半径、凸度和形状剔除纤维间的缝隙与间质。中央核判定：距膜超过设定距离的中心区内，细胞核面积达到设定值即判为中央核纤维。损伤区为全部中央核纤维的并集。</p>
+    <p lang="en">Fiber segmentation: after background subtraction and smoothing of the WGA channel, dark regions surrounded by brighter rings are taken as fiber centers (h-minima), and a watershed from these centers places each fiber boundary on the middle of the WGA membrane. A membrane mask at 0.7 × the Otsu threshold gives the area inside the membrane and the distance to the membrane. Gaps between fibers and interstitium are rejected by inner area, inscribed radius, solidity and shape. Central nuclei: a fiber is centrally nucleated when the set nuclear area lies in its core, farther than the set distance from the membrane. The injured region is the union of all centrally nucleated fibers.</p>
     <p>红色阳性面积只统计纤维内部的像素，纤维间隙中的红色信号不计入。自动阈值使用Otsu法；红色信号稀疏时自动阈值可能偏低，请打开"红色阳性像素"叠加层核对后手动调整。</p>
     <p lang="en">Red-positive area counts only pixels inside fibers; red signal in the interstitium is ignored. Automatic thresholds use Otsu's method, which can run low when red signal is sparse; check the "Red+ pixels" overlay and adjust manually.</p>
     <p>同一批实验请使用相同的参数，并先用几张图人工核对自动判定结果。统计时以动物为单位，不要以切片或视野为单位。</p>
@@ -340,6 +349,8 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
     <p lang="en">Fiber-free injured areas: pixels in drawn regions or auto-detected DAPI-dense areas that do not belong to any detected fiber are added to the injured area, and their red pixels to the red+ area. The summary lists this part separately.</p>
     <p>手动圈画：漏识别的纤维可用"圈画纤维"沿纤维内缘圈出，圈内尚未属于其他纤维的像素组成一根新纤维，并按同样规则判定中央核和红色阳性；漏掉的红色信号可用"圈画红色阳性"圈出，圈内像素计为红色阳性。所有圈画都记录在CSV中，"撤销"按圈画顺序逐个删除。</p>
     <p lang="en">Manual drawing: trace a missed fiber along its inner edge with "Draw fiber"; pixels inside that do not belong to another fiber form a new fiber, classified by the same rules. Outline missed red signal with "Draw red+"; pixels inside count as red+. All drawings are recorded in the CSV, and Undo removes them in reverse order.</p>
+    <p>Cellpose分割：通过本机运行的 cellpose_server.py 打开本页时，可直接点"用Cellpose分割（本机GPU）"；也可导入Cellpose输出的标签图代替内置分割。导入后，纤维边界以Cellpose为准，但每个对象只保留其内部和靠近自身一侧的一半WGA膜，Cellpose划入的纤维间隙会被去除；之后只排除接触图像边缘、过小或过大的对象；中央核、红色阳性、损伤区和面积测量照常进行。</p>
+    <p lang="en">Cellpose segmentation: when this page is opened through cellpose_server.py on your computer, "Segment with Cellpose (local GPU)" runs Cellpose directly; alternatively a Cellpose label image can be imported in place of the built-in segmentation. Fiber outlines then come from Cellpose, but each object keeps only its interior and the half of the WGA membrane on its own side, so gaps that Cellpose assigned to fibers are removed; only objects touching the image edge or outside the area range are excluded; central nuclei, red positivity, the injured region and area measurements are computed as usual.</p>
     <p lang="en">Use the same parameters across an experiment and verify the automatic calls on a few images first. Treat the animal, not the section or field, as the statistical unit.</p>
   </details>
 </main>
@@ -349,7 +360,7 @@ tr.sel{outline:2px solid var(--accent);outline-offset:-2px}
 <script>
 (function(){
 "use strict";
-const VERSION="1.10.0";
+const VERSION="2.3.0";
 const $=id=>document.getElementById(id);
 const tick=()=>new Promise(r=>setTimeout(r,0));
 const S={src:null,work:null,seg:null,nuc:null,mk:null,cls:null,ov:new Map(),sel:0,zoom:1,keys:{},busy:false,rejOv:new Map(),polys:[],dense:null,extra:null,drawMode:null,cur:null};
@@ -435,7 +446,7 @@ function guessChannels(ch){
   return {nuc:0,mem:Math.min(1,ch.length-1),mk:Math.min(2,ch.length-1)};
 }
 function setSource(src,label){
-  S.name=label;S.src=src;$('diag').textContent='';S.work=S.seg=S.nuc=S.mk=S.cls=null;S.ov.clear();S.rejOv.clear();S.sel=0;S.keys={};S.polys=[];S.dense=S.extra=null;$('drawBtn').disabled=false;updatePolyUI();
+  S.name=label;S.src=src;$('diag').textContent='';if(S.cpMask)clearMask();S.work=S.seg=S.nuc=S.mk=S.cls=null;S.ov.clear();S.rejOv.clear();S.sel=0;S.keys={};S.polys=[];S.dense=S.extra=null;$('drawBtn').disabled=false;updatePolyUI();
   const g=guessChannels(src.ch);
   for(const [id,k] of [['chMem','mem'],['chNuc','nuc'],['chMk','mk']]){
     const s=$(id);s.innerHTML='';src.ch.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=c.name+'  '+toEn(c.name);s.appendChild(o);});s.value=g[k];
@@ -549,7 +560,7 @@ function grow(L,mem,dil,w,h,k){for(let it=0;it<k;it++){const p=L.slice();let ch=
 /* ---------- Pipeline ---------- */
 function params(){return{
   ch:{mem:+$('chMem').value,nuc:+$('chNuc').value,mk:+$('chMk').value},px:num('pxUm'),scale:$('scale').value,
-  mem:{bg:num('memBg'),sig:num('memSig'),auto:$('memAuto').checked,thr:num('memThr'),dil:Math.round(num('memDil')),aMin:num('aMin'),aMax:num('aMax'),nb:$('noBorder').checked,dil2:$('dil2On').checked?Math.round(num('memDil2')):-1,redKeep:$('redKeep').checked,shapeMax:num('shapeMax'),nucMax:num('nucMax'),riMin:num('riMin'),solMin:num('solMin')},
+  mem:{bg:num('memBg'),sig:num('memSig'),auto:$('memAuto').checked,thr:num('memThr'),dil:Math.round(num('memDil')),aMin:num('aMin'),aMax:num('aMax'),nb:$('noBorder').checked,dil2:$('dil2On').checked?Math.round(num('memDil2')):-1,redKeep:$('redKeep').checked,shapeMax:num('shapeMax'),nucMax:num('nucMax'),riMin:num('riMin'),solMin:num('solMin'),wsH:6,seedSig:1.5},
   nuc:{bg:num('nucBg'),auto:$('nucAuto').checked,thr:num('nucThr')},
   mk:{bg:num('mkBg'),auto:$('mkAuto').checked,thr:num('mkThr')},
   cls:{inset:num('inset'),minNuc:num('minNuc'),frac:num('mkFrac'),incl:$('inclMk').checked,mode:$('mkMode').value,band:num('mkBand')},
@@ -578,6 +589,186 @@ function solidity(L,bnd,area,n,w,h){ // area / convex-hull area per label, from 
     const H=lo.slice(0,-1).concat(up.slice(0,-1));let A=0,per=0;for(let i=0;i<H.length;i++){const a=H[i],b=H[(i+1)%H.length];A+=a[0]*b[1]-b[0]*a[1];per+=Math.hypot(b[0]-a[0],b[1]-a[1]);}
     const hullPx=Math.abs(A)/2+per/2+1;out[l]=Math.min(1,area[l]/hullPx);}
   return out;
+}
+function recDil(J,I,w,h){ // morphological reconstruction by dilation of J under I (8-connected), in place
+  const N=w*h;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let v=J[i];
+    if(x>0&&J[i-1]>v)v=J[i-1];if(y>0){if(J[i-w]>v)v=J[i-w];if(x>0&&J[i-w-1]>v)v=J[i-w-1];if(x<w-1&&J[i-w+1]>v)v=J[i-w+1];}J[i]=v<I[i]?v:I[i];}
+  const Q=[];
+  for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){const i=y*w+x;let v=J[i];
+    if(x<w-1&&J[i+1]>v)v=J[i+1];if(y<h-1){if(J[i+w]>v)v=J[i+w];if(x<w-1&&J[i+w+1]>v)v=J[i+w+1];if(x>0&&J[i+w-1]>v)v=J[i+w-1];}J[i]=v<I[i]?v:I[i];
+    const c=J[i];if((x<w-1&&J[i+1]<c&&J[i+1]<I[i+1])||(y<h-1&&((J[i+w]<c&&J[i+w]<I[i+w])||(x<w-1&&J[i+w+1]<c&&J[i+w+1]<I[i+w+1])||(x>0&&J[i+w-1]<c&&J[i+w-1]<I[i+w-1]))))Q.push(i);}
+  for(let k=0;k<Q.length;k++){const p=Q[k],x=p%w,y=(p-x)/w,c=J[p];
+    for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if((!dx&&!dy)||xx<0||xx>=w)continue;const n=yy*w+xx;
+      if(J[n]<c&&J[n]!==I[n]){J[n]=c<I[n]?c:I[n];Q.push(n);}}}
+    if(k>4e6&&k>Q.length/2){Q.splice(0,k+1);k=-1;}}
+}
+function readLabelTiff(buf){
+  if(!window.UTIF)throw bi('TIFF读取组件未能加载。','The TIFF reader failed to load.');
+  const ifds=UTIF.decode(buf);const ifd=ifds.find(d=>d.t256&&!(d.t254&&(d.t254[0]&1)));if(!ifd)throw bi('无法读取这个标签图。','Cannot read this label image.');
+  UTIF.decodeImage(buf,ifd,ifds);const w=ifd.width,h=ifd.height,bps=ifd.t258?ifd.t258[0]:8,spp=ifd.t277?ifd.t277[0]:1,n=w*h,d=ifd.data;
+  if(spp!==1)throw bi('标签图应为单通道（灰度）TIFF。','The label image must be a single-channel (grayscale) TIFF.');
+  const dv=new DataView(d.buffer,d.byteOffset,d.byteLength),L=new Uint32Array(n);let mx=0;
+  for(let i=0;i<n;i++){const v=bps===8?d[i]:bps===16?dv.getUint16(i*2,true):dv.getUint32(i*4,true);L[i]=v;if(v>mx)mx=v;}
+  return {w,h,L,max:mx};
+}
+async function loadMask(file){
+  if(!S.src){status('请先载入原图，再载入Cellpose标签图。','Load the image first, then its Cellpose label image.',0,true);return;}
+  try{const m=readLabelTiff(await file.arrayBuffer()),W0=Math.round(S.src.w*S.src.pre),H0=Math.round(S.src.h*S.src.pre);
+    if(!((m.w===W0&&m.h===H0)||(m.w===S.src.w&&m.h===S.src.h)))throw bi(`标签图尺寸（${m.w} × ${m.h}）与原图（${W0} × ${H0}）不一致，请确认是同一张图的分割结果。`,`The label image (${m.w} × ${m.h}) does not match the image (${W0} × ${H0}); make sure it belongs to this image.`);
+    S.cpMask=Object.assign(m,{name:file.name,id:Date.now()});S.keys.seg=null;
+    const info=$('cpInfo');info.textContent=`已载入Cellpose分割：${file.name}，${m.max}个对象。运行分析时将使用它代替自动分割。`;const e=document.createElement('span');e.className='en';e.textContent=`Cellpose masks loaded: ${file.name}, ${m.max} objects. The analysis will use them instead of the automatic segmentation.`;info.appendChild(e);
+    $('cpClear').classList.remove('hide');status('已载入Cellpose分割，点"运行分析"。','Cellpose masks loaded; click Run analysis.',0);
+  }catch(e){console.error(e);status(e.message||'读取失败',e.en||'Could not read the label image.',0,true);}
+}
+let cpLocal=null;
+(async()=>{if(!/^https?:$/.test(location.protocol)||!/^(127\.0\.0\.1|localhost)$/.test(location.hostname))return;
+  try{const r=await fetch('/api/status');if(!r.ok)return;cpLocal=await r.json();if(!cpLocal.ok)return;$('cpRun').classList.remove('hide');
+    $('cpRun').title=`Cellpose ${cpLocal.cellpose||''} · ${cpLocal.model} · GPU: ${cpLocal.gpu?'yes':'no'}`;}catch(e){}})();
+async function runLocalCellpose(){
+  if(!S.src){status('请先载入图像。','Load an image first.',0,true);return;}
+  if(S.busy)return;S.busy=true;$('cpRun').disabled=true;
+  try{const ci=+$('chMem').value,ch=S.src.ch[ci].data,t0=performance.now();
+    status(`Cellpose正在分割（${cpLocal&&cpLocal.gpu?'GPU':'CPU'}）…`,'Cellpose is segmenting…',10);await tick();
+    const res=await fetch('/api/segment',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Width':String(S.src.w),'X-Height':String(S.src.h),'X-Pixel-Um':String(num('pxUm')*S.src.pre)},body:ch});
+    if(!res.ok)throw bi('Cellpose分割失败：'+(await res.text()),'Cellpose failed: see the server window.');
+    const buf=await res.arrayBuffer(),dt=res.headers.get('X-Dtype'),L=dt==='uint32'?new Uint32Array(buf):Uint32Array.from(new Uint16Array(buf));
+    let mx=0;for(let i=0;i<L.length;i++)if(L[i]>mx)mx=L[i];
+    const name=`Cellpose ${res.headers.get('X-Model')||''}（本机 local）`;
+    S.cpMask={w:S.src.w,h:S.src.h,L,max:mx,name,id:Date.now()};S.keys.seg=null;
+    const info=$('cpInfo');info.textContent=`Cellpose分割完成：${mx}个对象，用时 ${res.headers.get('X-Seconds')||((performance.now()-t0)/1000).toFixed(1)} 秒。`;const e=document.createElement('span');e.className='en';e.textContent=`Cellpose finished: ${mx} objects.`;info.appendChild(e);
+    $('cpClear').classList.remove('hide');
+  }catch(e){console.error(e);S.busy=false;$('cpRun').disabled=false;status(e.message||'Cellpose分割失败',e.en||'Cellpose failed; is cellpose_server.py still running?',0,true);return;}
+  S.busy=false;$('cpRun').disabled=false;run();
+}
+function clearMask(){S.cpMask=null;S.keys.seg=null;$('cpClear').classList.add('hide');$('cpFile').value='';
+  const info=$('cpInfo');info.textContent='先载入原图，再载入同一张图的Cellpose标签图（*_cp_masks.tif）。运行分析时将用它代替自动分割。';const e=document.createElement('span');e.className='en';e.textContent='Load the image first, then its Cellpose label image (*_cp_masks.tif). The analysis will use it instead of the automatic segmentation.';info.appendChild(e);}
+async function segmentFromMask(P,um,nucM){
+  const {w,h}=S.work,N=w*h,cm=S.cpMask,sx=cm.w/w,sy=cm.h/h;
+  status('读取Cellpose分割…','Reading Cellpose masks…',20);await tick();
+  const Lr=new Int32Array(N);for(let y=0;y<h;y++){const yy=Math.min(cm.h-1,Math.floor((y+0.5)*sy))*cm.w;for(let x=0;x<w;x++)Lr[y*w+x]=cm.L[yy+Math.min(cm.w-1,Math.floor((x+0.5)*sx))];}
+  let f=toF(S.work.mem);subBg(f,w,h,40/um);gauss(f,w,h,Math.max(0.5,1/um));
+  const thr=P.auto?Math.max(1,Math.round(otsu(f)*0.7)):P.thr,M=new Uint8Array(N);for(let i=0;i<N;i++)M[i]=f[i]<=thr?1:0;f=null;
+  const D=new Uint16Array(N);for(let i=0;i<N;i++)D[i]=M[i]?65535:0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let d=D[i];if(!d)continue;let c;
+    if(x>0){c=D[i-1]+3;if(c<d)d=c;}else d=Math.min(d,3);if(y>0){c=D[i-w]+3;if(c<d)d=c;if(x>0){c=D[i-w-1]+4;if(c<d)d=c;}if(x<w-1){c=D[i-w+1]+4;if(c<d)d=c;}}else d=Math.min(d,3);D[i]=d;}
+  for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){const i=y*w+x;let d=D[i];if(!d)continue;let c;
+    if(x<w-1){c=D[i+1]+3;if(c<d)d=c;}else d=Math.min(d,3);if(y<h-1){c=D[i+w]+3;if(c<d)d=c;if(x<w-1){c=D[i+w+1]+4;if(c<d)d=c;}if(x>0){c=D[i+w-1]+4;if(c<d)d=c;}}else d=Math.min(d,3);D[i]=d;}
+  // consecutive ids
+  const remap=new Map();let n=0;for(let i=0;i<N;i++){const v=Lr[i];if(v&&!remap.has(v))remap.set(v,++n);}
+  for(let i=0;i<N;i++){const v=Lr[i];if(v)Lr[i]=remap.get(v);}
+  if(P.cpTrim!==false){
+  // ---- trim Cellpose objects: keep each region's own interior plus the half of its membrane nearest to it; drop gaps beyond the membrane
+  status('确定膜中线…','Locating membrane midlines…',52);await tick();
+  {const C=new Int32Array(N);let par=new Int32Array(1024),nx=1;const find=x=>{while(par[x]!==x){par[x]=par[par[x]];x=par[x];}return x;};
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=Lr[i];if(!M[i]||!l)continue;
+      const u=(y&&M[i-w]&&Lr[i-w]===l)?C[i-w]:0,lf=(x&&M[i-1]&&Lr[i-1]===l)?C[i-1]:0;
+      if(!u&&!lf){if(nx>=par.length){const p2=new Int32Array(par.length*2);p2.set(par);par=p2;}par[nx]=nx;C[i]=nx++;}
+      else if(u&&lf){const a=find(u),b=find(lf);if(a!==b){if(a<b)par[b]=a;else par[a]=b;}C[i]=a<b?a:b;}
+      else C[i]=u||lf;}
+    for(let i=0;i<N;i++)if(C[i])C[i]=find(C[i]);
+    const cs=new Int32Array(nx),cz=new Int32Array(nx),cr=new Int32Array(nx);
+    for(let i=0;i<N;i++){const c=C[i];if(!c)continue;cz[c]++;cr[c]=Lr[i];}
+    const best=new Int32Array(n+1),bs=new Int32Array(n+1).fill(-1),bz=new Int32Array(n+1);
+    for(let c=1;c<nx;c++){if(!cz[c])continue;const l=cr[c];if(cs[c]>bs[l]||(cs[c]===bs[l]&&cz[c]>bz[l])){best[l]=c;bs[l]=cs[c];bz[l]=cz[c];}}
+    const NL=new Int32Array(N);for(let i=0;i<N;i++){const c=C[i];if(c&&best[Lr[i]]===c)NL[i]=Lr[i];}
+    const DD=new Uint16Array(N);for(let i=0;i<N;i++)DD[i]=(M[i]&&!NL[i])?0:65535;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let d=DD[i];if(!d)continue;let c;
+      if(x>0){c=DD[i-1]+3;if(c<d)d=c;}if(y>0){c=DD[i-w]+3;if(c<d)d=c;if(x>0){c=DD[i-w-1]+4;if(c<d)d=c;}if(x<w-1){c=DD[i-w+1]+4;if(c<d)d=c;}}DD[i]=d;}
+    for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){const i=y*w+x;let d=DD[i];if(!d)continue;let c;
+      if(x<w-1){c=DD[i+1]+3;if(c<d)d=c;}if(y<h-1){c=DD[i+w]+3;if(c<d)d=c;if(x<w-1){c=DD[i+w+1]+4;if(c<d)d=c;}if(x>0){c=DD[i+w-1]+4;if(c<d)d=c;}}DD[i]=d;}
+    const DI=new Uint16Array(N).fill(65535),Q=new Int32Array(N);let qh=0,qt=0;
+    for(let i=0;i<N;i++)if(NL[i]){DI[i]=0;const x=i%w;if((x>0&&!M[i-1])||(x<w-1&&!M[i+1])||(i>=w&&!M[i-w])||(i<N-w&&!M[i+w]))Q[qt++]=i;}
+    while(qh<qt){const p=Q[qh++],x=p%w,l=NL[p],d=DI[p]+3;
+      for(const q of [x>0?p-1:-1,x<w-1?p+1:-1,p>=w?p-w:-1,p<N-w?p+w:-1]){if(q<0||M[q]||NL[q]||DI[q]!==65535||Lr[q]!==l)continue;if(d<=DD[q]+2){DI[q]=d;NL[q]=l;Q[qt++]=q;}}}
+    Lr.set(NL);}
+  }
+  status('统计纤维…','Measuring fibers…',50);await tick();
+  const area=new Int32Array(n+1),inner=new Int32Array(n+1),bd=new Uint8Array(n+1),sxx=new Float64Array(n+1),syy=new Float64Array(n+1),md=new Uint16Array(n+1),bnd=new Uint8Array(N);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=Lr[i];if(!l)continue;area[l]++;sxx[l]+=x;syy[l]+=y;if(!x||!y||x===w-1||y===h-1)bd[l]=1;
+    if(M[i]){inner[l]++;if(D[i]>md[l])md[l]=D[i];}
+    if(!x||!y||x===w-1||y===h-1||Lr[i-1]!==l||Lr[i+1]!==l||Lr[i-w]!==l||Lr[i+w]!==l)bnd[i]=1;}
+  const pa=um*um,map=new Int32Array(n+1),rmap=new Int32Array(n+1),fib=[null],rej=[null];
+  for(let l=1;l<=n;l++){const a=area[l]*pa,ai=inner[l]*pa;let why='';
+    if(P.nb&&bd[l])why='border';else if(a<P.aMin*0.5)why='small';else if(a>P.aMax)why='large';
+    if(!why){map[l]=fib.length;fib.push({id:fib.length,area:area[l],inner:inner[l],cx:sxx[l]/area[l],cy:syy[l]/area[l]});}
+    else{rmap[l]=rej.length;rej.push({area:a,why,show:true,shape:0,nf:0,ri:md[l]/3*um,so:1});}}
+  const R=new Int32Array(N),L=new Int32Array(N),dist=new Uint16Array(N);
+  for(let i=0;i<N;i++){const l=Lr[i];if(!l)continue;const m=map[l];if(m){L[i]=m;dist[i]=M[i]?D[i]:0;}else{R[i]=rmap[l];bnd[i]=0;}}
+  const Mn=fib.length-1,maxD=new Uint16Array(Mn+1);for(let l=1;l<=n;l++)if(map[l])maxD[map[l]]=Math.max(3,md[l]);
+  return {L,n:Mn,fib,bnd,dist,maxD,thr,R,rej,mem:null,ws:true,cp:true};
+}
+async function segmentWS(P,um,nucM){
+  const {w,h}=S.work,N=w*h;let f=toF(S.work.mem);
+  status('扣除WGA背景并平滑…','Subtracting WGA background and smoothing…',15);await tick();subBg(f,w,h,40/um);gauss(f,w,h,Math.max(0.5,1/um));
+  const thr=P.auto?Math.max(1,Math.round(otsu(f)*0.7)):P.thr,M=new Uint8Array(N);for(let i=0;i<N;i++)M[i]=f[i]<=thr?1:0;
+  status('计算到膜的距离…','Computing distance to membrane…',25);await tick();
+  const D=new Uint16Array(N);for(let i=0;i<N;i++)D[i]=M[i]?65535:0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let d=D[i];if(!d)continue;let c;
+    if(x>0){c=D[i-1]+3;if(c<d)d=c;}else d=Math.min(d,3);if(y>0){c=D[i-w]+3;if(c<d)d=c;if(x>0){c=D[i-w-1]+4;if(c<d)d=c;}if(x<w-1){c=D[i-w+1]+4;if(c<d)d=c;}}else d=Math.min(d,3);D[i]=d;}
+  for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){const i=y*w+x;let d=D[i];if(!d)continue;let c;
+    if(x<w-1){c=D[i+1]+3;if(c<d)d=c;}else d=Math.min(d,3);if(y<h-1){c=D[i+w]+3;if(c<d)d=c;if(x<w-1){c=D[i+w+1]+4;if(c<d)d=c;}if(x>0){c=D[i+w-1]+4;if(c<d)d=c;}}else d=Math.min(d,3);D[i]=d;}
+  status('寻找纤维中心…','Finding fiber centers…',35);await tick();
+  // seeds: h-minima of smoothed WGA intensity (dark fiber interiors surrounded by brighter rings)
+  const g=f.slice();gauss(g,w,h,Math.max(0.7,P.seedSig/um));const V=new Uint16Array(N);for(let i=0;i<N;i++){const v=255-(g[i]>255?255:g[i]<0?0:g[i]);V[i]=Math.round(v*4);}
+  const hI=Math.max(2,Math.round(P.wsH*4)),J=new Uint16Array(N);for(let i=0;i<N;i++)J[i]=V[i]>hI?V[i]-hI:0;recDil(J,V,w,h);
+  const half=Math.max(1,Math.ceil(hI/2)),seed=new Uint8Array(N);for(let i=0;i<N;i++)seed[i]=(V[i]-J[i]>=half)?0:1;
+  const {L:S0,n:n0}=label(seed,w,h),top=new Uint16Array(n0+1);for(let i=0;i<N;i++){const c=S0[i];if(c){const v=V[i]-J[i];if(v>top[c])top[c]=v;}}
+  const keep=new Int32Array(n0+1);let ns=0;for(let c=1;c<=n0;c++)if(top[c]>=hI-1)keep[c]=++ns;
+  const Sd=S0;for(let i=0;i<N;i++){const c=Sd[i];if(c)Sd[i]=keep[c];}
+  status('分水岭分割…','Watershed segmentation…',45);await tick();
+  const I=new Uint8Array(N);for(let i=0;i<N;i++){const v=f[i];I[i]=v>255?255:v<0?0:v;}f=null;
+  const seedM=new Uint8Array(N);for(let i=0;i<N;i++)if(Sd[i])seedM[i]=1;
+  const Lw=Sd,qd=new Uint8Array(N),B=[];for(let k=0;k<256;k++)B.push([]);
+  for(let i=0;i<N;i++)if(Lw[i])qd[i]=1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=Lw[i];if(!l)continue;
+    for(const q of [x>0?i-1:-1,x<w-1?i+1:-1,y>0?i-w:-1,y<h-1?i+w:-1]){if(q<0||qd[q])continue;qd[q]=1;B[I[q]].push(q);}}
+  for(let lev=0;lev<256;lev++){const b=B[lev];for(let k=0;k<b.length;k++){const p=b[k],x=p%w;let l=0;
+      if(x>0&&Lw[p-1])l=Lw[p-1];else if(x<w-1&&Lw[p+1])l=Lw[p+1];else if(p>=w&&Lw[p-w])l=Lw[p-w];else if(p<N-w&&Lw[p+w])l=Lw[p+w];Lw[p]=l;
+      for(const q of [x>0?p-1:-1,x<w-1?p+1:-1,p>=w?p-w:-1,p<N-w?p+w:-1]){if(q<0||qd[q])continue;qd[q]=1;B[I[q]<lev?lev:I[q]].push(q);}}
+    B[lev]=null;}
+  // ---- keep each region's own interior plus the half of its membrane nearest to it; drop gaps beyond the membrane
+  status('确定膜中线…','Locating membrane midlines…',52);await tick();
+  {const C=new Int32Array(N);let par=new Int32Array(1024),nx=1;const find=x=>{while(par[x]!==x){par[x]=par[par[x]];x=par[x];}return x;};
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=Lw[i];if(!M[i]||!l)continue;
+      const u=(y&&M[i-w]&&Lw[i-w]===l)?C[i-w]:0,lf=(x&&M[i-1]&&Lw[i-1]===l)?C[i-1]:0;
+      if(!u&&!lf){if(nx>=par.length){const p2=new Int32Array(par.length*2);p2.set(par);par=p2;}par[nx]=nx;C[i]=nx++;}
+      else if(u&&lf){const a=find(u),b=find(lf);if(a!==b){if(a<b)par[b]=a;else par[a]=b;}C[i]=a<b?a:b;}
+      else C[i]=u||lf;}
+    for(let i=0;i<N;i++)if(C[i])C[i]=find(C[i]);
+    const cs=new Int32Array(nx),cz=new Int32Array(nx),cr=new Int32Array(nx);
+    for(let i=0;i<N;i++){const c=C[i];if(!c)continue;cz[c]++;cr[c]=Lw[i];if(seedM[i])cs[c]++;}
+    const best=new Int32Array(ns+1),bs=new Int32Array(ns+1).fill(-1),bz=new Int32Array(ns+1);
+    for(let c=1;c<nx;c++){if(!cz[c])continue;const l=cr[c];if(cs[c]>bs[l]||(cs[c]===bs[l]&&cz[c]>bz[l])){best[l]=c;bs[l]=cs[c];bz[l]=cz[c];}}
+    const NL=new Int32Array(N);for(let i=0;i<N;i++){const c=C[i];if(c&&best[Lw[i]]===c)NL[i]=Lw[i];}
+    const DD=new Uint16Array(N);for(let i=0;i<N;i++)DD[i]=(M[i]&&!NL[i])?0:65535;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let d=DD[i];if(!d)continue;let c;
+      if(x>0){c=DD[i-1]+3;if(c<d)d=c;}if(y>0){c=DD[i-w]+3;if(c<d)d=c;if(x>0){c=DD[i-w-1]+4;if(c<d)d=c;}if(x<w-1){c=DD[i-w+1]+4;if(c<d)d=c;}}DD[i]=d;}
+    for(let y=h-1;y>=0;y--)for(let x=w-1;x>=0;x--){const i=y*w+x;let d=DD[i];if(!d)continue;let c;
+      if(x<w-1){c=DD[i+1]+3;if(c<d)d=c;}if(y<h-1){c=DD[i+w]+3;if(c<d)d=c;if(x<w-1){c=DD[i+w+1]+4;if(c<d)d=c;}if(x>0){c=DD[i+w-1]+4;if(c<d)d=c;}}DD[i]=d;}
+    const DI=new Uint16Array(N).fill(65535),Q=new Int32Array(N);let qh=0,qt=0;
+    for(let i=0;i<N;i++)if(NL[i]){DI[i]=0;const x=i%w;if((x>0&&!M[i-1])||(x<w-1&&!M[i+1])||(i>=w&&!M[i-w])||(i<N-w&&!M[i+w]))Q[qt++]=i;}
+    while(qh<qt){const p=Q[qh++],x=p%w,l=NL[p],d=DI[p]+3;
+      for(const q of [x>0?p-1:-1,x<w-1?p+1:-1,p>=w?p-w:-1,p<N-w?p+w:-1]){if(q<0||M[q]||NL[q]||DI[q]!==65535||Lw[q]!==l)continue;if(d<=DD[q]+2){DI[q]=d;NL[q]=l;Q[qt++]=q;}}}
+    Lw.set(NL);}
+  status('筛选纤维…','Filtering fibers…',58);await tick();
+  const n=ns,area=new Int32Array(n+1),inner=new Int32Array(n+1),bd=new Uint8Array(n+1),sx=new Float64Array(n+1),sy=new Float64Array(n+1),md=new Uint16Array(n+1),nc=new Int32Array(n+1);
+  const bnd=new Uint8Array(N);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=Lw[i];if(!l)continue;area[l]++;sx[l]+=x;sy[l]+=y;if(!x||!y||x===w-1||y===h-1)bd[l]=1;
+    if(M[i]){inner[l]++;if(D[i]>md[l])md[l]=D[i];if(nucM&&nucM[i])nc[l]++;}
+    if(!x||!y||x===w-1||y===h-1||Lw[i-1]!==l||Lw[i+1]!==l||Lw[i-w]!==l||Lw[i+w]!==l)bnd[i]=1;}
+  const Li=new Int32Array(N),ib=new Uint8Array(N);for(let i=0;i<N;i++)if(M[i])Li[i]=Lw[i];
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=Li[i];if(!l)continue;if(!x||!y||x===w-1||y===h-1||Li[i-1]!==l||Li[i+1]!==l||Li[i-w]!==l||Li[i+w]!==l)ib[i]=1;}
+  const sol=solidity(Li,ib,inner,n,w,h),pa=um*um,map=new Int32Array(n+1),rmap=new Int32Array(n+1),fib=[null],rej=[null];
+  for(let l=1;l<=n;l++){const a=area[l]*pa,ri=md[l]/3,shape=inner[l]/(Math.PI*Math.max(1,ri*ri)),nf=inner[l]?nc[l]/inner[l]*100:0,so=sol[l];let why='';
+    const ai=inner[l]*pa;if(P.nb&&bd[l])why=a>P.aMax?'bg':'border';else if(ai<P.aMin)why='small';else if(a>P.aMax)why='large';
+    else if(ri*um<0.7*Math.sqrt(P.aMin/Math.PI))why='thin';else if(so<P.solMin-0.1||(so<P.solMin&&nf>25&&P.nucMax>0))why='concave';else if(shape>P.shapeMax)why='shape';else if(P.nucMax>0&&nf>P.nucMax)why='nuclei';
+    if(!why){map[l]=fib.length;fib.push({id:fib.length,area:area[l],inner:inner[l],cx:sx[l]/area[l],cy:sy[l]/area[l],so,nf,ri:ri*um,ai:inner[l]*pa});}
+    else{rmap[l]=rej.length;rej.push({area:a,why,show:why!=='bg',shape,nf,ri:ri*um,so});}}
+  const R=new Int32Array(N),L=new Int32Array(N),dist=new Uint16Array(N);
+  for(let i=0;i<N;i++){const l=Lw[i];if(!l)continue;const m=map[l];if(m){L[i]=m;dist[i]=M[i]?D[i]:0;}else{R[i]=rmap[l];bnd[i]=0;}}
+  const Mn=fib.length-1,maxD=new Uint16Array(Mn+1);for(let l=1;l<=n;l++)if(map[l])maxD[map[l]]=md[l];
+  return {L,n:Mn,fib,bnd,dist,maxD,thr,R,rej,mem:null,ws:true};
 }
 async function segment(P,um,nucM,redM){
   const {w,h}=S.work,N=w*h;let f=toF(S.work.mem);
@@ -780,6 +971,7 @@ function classify(){
 }
 
 function showDiag(p){
+  if(S.seg&&S.seg.ws){const d=$('diag');d.textContent=S.seg.cp?`分割来源：Cellpose（${S.cpMask?S.cpMask.name:''}）。 Segmentation: Cellpose. `:'';if(S.src.pxSrc!=='meta'){d.textContent+='图像中没有像素尺寸信息，请确认填写的像素尺寸正确，它决定所有面积。';const e=document.createElement('span');e.className='en';e.textContent='The image has no pixel-size metadata; make sure the pixel size is correct, as it sets all areas.';d.appendChild(e);}return;}
   const c={};for(const r of S.seg.rej.slice(1))if(r.why!=='bg')c[r.why]=(c[r.why]||0)+1;const n=S.seg.n||1,um=umPx(),tips=[],en=[];
   const cnt=`未识别区域：过小 ${c.small||0}，过大 ${c.large||0}，形状不规则 ${c.shape||0}，太窄 ${c.thin||0}，凹形 ${c.concave||0}，细胞核过多 ${c.nuclei||0}，接触边缘 ${c.border||0}。`;
   const cntEn=`Undetected: small ${c.small||0}, oversized ${c.large||0}, irregular ${c.shape||0}, narrow ${c.thin||0}, concave ${c.concave||0}, nucleus-rich ${c.nuclei||0}, edge ${c.border||0}.`;
@@ -799,8 +991,8 @@ async function run(){
     const kSeg=JSON.stringify([S.keys.work,p.px,p.mem]),kNuc=JSON.stringify([S.keys.work,p.px,p.nuc]),kMk=JSON.stringify([S.keys.work,p.px,p.mk]);
     if(S.keys.nuc!==kNuc){S.nuc=await mask(S.work.nuc,p.nuc,um,['识别细胞核…','Detecting nuclei…'],8);S.keys.nuc=kNuc;}
     if(S.keys.mk!==kMk){S.mk=await mask(S.work.mk,p.mk,um,['识别红色阳性像素…','Detecting red+ pixels…'],12);S.keys.mk=kMk;}
-    const kSeg2=kSeg+kNuc+((p.rs.on||p.mem.redKeep)?kMk:'')+(p.rs.on?JSON.stringify(p.rs):'');
-    if(S.keys.seg!==kSeg2){S.seg=await segment(p.mem,um,S.nuc.m,S.mk.base||S.mk.m);
+    const kSeg2=kSeg+kNuc+(S.cpMask?'cp'+S.cpMask.id:'')+((p.rs.on||p.mem.redKeep)?kMk:'')+(p.rs.on?JSON.stringify(p.rs):'');
+    if(S.keys.seg!==kSeg2){S.seg=S.cpMask?await segmentFromMask(p.mem,um,S.nuc.m):await segmentWS(p.mem,um,S.nuc.m);
       if(p.rs.on){status('用红色信号补充识别小纤维…','Detecting small red+ fibers…',70);await tick();const sm=redSeedMask(p.rs,um);S.seg.redThr=sm.thr;S.seg.redN=addRedFibers(S.seg,sm.m,p.rs,um);}
       S.keys.seg=kSeg2;S.sel=0;S.rejSel=0;S.ov.clear();S.rejOv.clear();}
     const kDn=JSON.stringify([kSeg,kNuc,p.dn]);if(S.keys.dn!==kDn){status('识别无纤维的DAPI密集区…','Detecting fiber-free DAPI-dense areas…',90);await tick();computeDense();S.keys.dn=kDn;}
@@ -951,7 +1143,7 @@ function csv(){
    L.push('# 纤维面积统计 Fiber area statistics (µm²),n,均值 mean,标准差 SD,中位数 median');
    L.push(row('损伤纤维 Injured fibers',A.inj),row('非损伤纤维 Non-injured fibers',A.non),row('红色阳性损伤纤维 Red+ injured fibers',A.red),row('全部纤维 All fibers',A.all));}
   L.push('# 参数 Parameters');
-  L.push(['工具版本 Tool version',VERSION].join(','),['分析时间 Analyzed at',new Date().toISOString()].join(','),['图像 Image',q(S.name||'')].join(','));
+  L.push(['工具版本 Tool version',VERSION].join(','),['分割来源 Segmentation',S.seg&&S.seg.cp?q('Cellpose: '+(S.cpMask?S.cpMask.name:'')):'built-in watershed'].join(','),['分析时间 Analyzed at',new Date().toISOString()].join(','),['图像 Image',q(S.name||'')].join(','));
   L.push([q('处理分辨率 Working resolution (µm/px)'),um.toFixed(4)].join(','),[q('原图像素尺寸 Original pixel size (µm/px)'),(p.px*S.src.pre).toFixed(4)].join(','),[q('缩放方式 Rescaling'),p.scale==='target'?'统一分辨率 common '+num('targetUm'):p.scale].join(','),[q('WGA阈值 WGA threshold'),S.seg.thr].join(','),[q('细胞核阈值 Nuclear threshold'),S.nuc.thr].join(','),[q('红色阈值 Red threshold'),S.mk.thr].join(','),
     [q('膜加粗 Membrane dilation (px)'),p.mem.dil].join(','),[q('第二遍膜加粗 Second-pass dilation (px)'),p.mem.dil2>=0?p.mem.dil2:'否 no'].join(','),[q('红色阳性区域不按细胞核剔除 Red+ regions exempt from nuclear filter'),p.mem.redKeep?'是 yes':'否 no'].join(','),[q('像素尺寸来源 Pixel size source'),S.src.pxSrc==='meta'?'Keyence metadata':'manual'].join(','),[q('最小凸度 Min. solidity'),p.mem.solMin].join(','),[q('最小内切半径 Min. inscribed radius (µm)'),p.mem.riMin].join(','),[q('最大形状指数 Max. shape index'),p.mem.shapeMax].join(','),[q('纤维内最大细胞核占比 Max. nuclear area in fiber (%)'),p.mem.nucMax].join(','),[q('面积范围 Area range (µm²)'),q(p.mem.aMin+'-'+p.mem.aMax)].join(','),[q('中心区内缩 Core inset (µm)'),p.cls.inset].join(','),
     [q('中心区最小核面积 Min. core nuclear area (µm²)'),p.cls.minNuc].join(','),[q('阳性纤维面积占比 Red+ fiber area fraction (%)'),p.cls.frac].join(','),[q('阳性判定外扩距离 Margin for red+ call (µm)'),p.cls.band].join(','),[q('红色补充识别小纤维 Red-detected small fibers'),p.rs.on?`${p.rs.minA}-${p.rs.maxA} µm², thr ${S.seg.redThr} (n=${S.seg.redN||0})`:'否 no'].join(','),[q('红色面积计算方式 Red+ area method'),p.cls.mode==='fiber'?'阳性纤维整根 whole red+ fibers':'按像素 pixels'].join(','),[q('红色手动修正纤维数 Fibers with manual red call'),c.rows.filter(x=>x.manualRed).length].join(','),[q('红色阳性纤维计入损伤区 Red+ fibers counted as injured'),p.cls.incl?'是 yes':'否 no'].join(','),[q('自动识别DAPI密集区 Auto DAPI-dense'),p.dn.auto?'是 yes':'否 no'].join(','),[q('密度半径 Density radius (µm)'),p.dn.r].join(','),[q('核覆盖率阈值 Nuclear coverage (%)'),p.dn.pct].join(','),[q('最小区域面积 Min. region area (µm²)'),p.dn.min].join(','),[q('计入的未识别区域类别 Undetected region categories counted as injured'),q(['inter','large','small','border'].filter(k=>p.dn.inc[k]).join(' ')||'none')].join(','),[q('单独设置的未识别区域数 Individually toggled undetected regions'),S.rejOv.size].join(','));
@@ -969,6 +1161,9 @@ function stamp(){const d=new Date(),z=n=>String(n).padStart(2,'0');return `${d.g
 
 /* ---------- Events ---------- */
 $('file').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadFile(f);});
+$('cpFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadMask(f);});
+$('cpRun').addEventListener('click',runLocalCellpose);
+$('cpClear').addEventListener('click',()=>{clearMask();status('已移除Cellpose分割，将使用自动分割。','Cellpose masks removed; the automatic segmentation will be used.',0);});
 $('demo').addEventListener('click',()=>{status('正在生成示例图…','Generating sample image…',5);setTimeout(()=>{makeDemo();},20);});
 $('run').addEventListener('click',run);
 $('scale').addEventListener('change',()=>{$('targetUm').disabled=$('scale').value!=='target';});

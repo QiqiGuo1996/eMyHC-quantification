@@ -1,6 +1,34 @@
 # Changelog
 
-All notable changes to FiberQuant are documented here. Versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to eMyHC_Quanti (named FiberQuant up to version 1.x) are documented here. Versions follow [Semantic Versioning](https://semver.org/).
+
+## [2.3.0] – [YYYY-MM-DD]
+
+Version used for the analyses in [Authors], *[Journal]* ([year]).
+
+### Changed
+- Each fiber keeps only its interior and the half of its WGA membrane on its own side, so fiber boundaries lie on the membrane midline and gaps between fibers are no longer included. Applies to both built-in and Cellpose segmentation.
+
+## [2.2.0]
+
+### Added
+- `cellpose_server.py`: runs Cellpose locally and serves the tool with a one-click "Segment with Cellpose (local GPU)" button; opens the browser automatically on Windows, macOS, Linux desktops and WSL.
+
+## [2.1.0]
+
+### Added
+- Import of Cellpose label images (`*_cp_masks.tif`) in place of the built-in segmentation; `cellpose_batch.py` for batch segmentation.
+- The segmentation source is recorded in the CSV.
+
+## [2.0.0]
+
+### Changed
+- New segmentation engine: fiber centers from h-minima of the WGA intensity and a marker-controlled watershed, replacing threshold-and-dilation segmentation. Pixel-based dilation parameters are no longer used, so 10× and 20× images are handled with the same settings.
+- Automatic WGA threshold set to 0.7 × Otsu; nuclear-content filter off by default; marker-based detection of small fibers off by default.
+- The minimum fiber area applies to the area inside the membrane (default 100 µm²).
+
+Results are not comparable with version 1.x; re-analyze all images with one version.
+
 
 ## [1.10.0] – [YYYY-MM-DD]
 

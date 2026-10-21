@@ -1,7 +1,7 @@
-cff-version: 1.10.0
+cff-version: 1.2.0
 message: "If you use this software, please cite both the article and the archived software version."
-title: "FiberQuant: browser-based quantification of muscle injury and regeneration"
-version: 1.10.0
+title: "eMyHC_Quanti: quantification of muscle injury and regeneration"
+version: 2.3.0
 date-released: "[YYYY-MM-DD]"
 license: MIT
 repository-code: "https://github.com/[user]/[repository]"
@@ -13,6 +13,7 @@ keywords:
   - image analysis
   - centrally nucleated fibers
   - embryonic myosin heavy chain
+  - cross-sectional area
 authors:
   - family-names: "[Family name]"
     given-names: "[Given name]"

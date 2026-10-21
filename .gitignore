@@ -1,0 +1,12 @@
+# images and analysis outputs (keep data out of the repository)
+*.tif
+*.tiff
+*_cp_masks.tif
+*.csv
+*.png
+!docs/*.png
+# Python
+__pycache__/
+*.pyc
+# Cellpose models trained locally
+models/
